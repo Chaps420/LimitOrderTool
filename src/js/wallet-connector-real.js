@@ -574,14 +574,34 @@ export class WalletConnector {
         const qrUrl = payloadData.refs?.qr_png || 
             `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(payloadData.next?.always || 'https://xumm.app')}`;
         
+        // Enhanced batch progress indicator
+        const progressPercent = ((current - 1) / total * 100).toFixed(0);
+        const isSequentialBatch = total > 1;
+        
         modal.innerHTML = `
             <div class="modal-overlay">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h3>📝 Sign Transaction ${current} of ${total}</h3>
+                        <h3>📝 ${isSequentialBatch ? `Batch Transaction ${current} of ${total}` : 'Sign Transaction'}</h3>
                         <button class="close-btn" onclick="this.closest('.signing-modal').remove()">&times;</button>
                     </div>
                     <div class="modal-body">
+                        ${isSequentialBatch ? `
+                        <div class="batch-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${progressPercent}%"></div>
+                            </div>
+                            <div class="progress-text">
+                                Transaction ${current} of ${total} • ${progressPercent}% Complete
+                            </div>
+                            <div class="batch-info">
+                                <p>🔄 <strong>Sequential Batch Processing</strong></p>
+                                <p>Each transaction requires individual approval for security.</p>
+                                ${current > 1 ? `<p>✅ ${current - 1} transaction(s) completed</p>` : ''}
+                            </div>
+                        </div>
+                        ` : ''}
+                        
                         <div class="qr-container">
                             <div class="qr-placeholder">
                                 <img src="${qrUrl}" alt="Transaction QR Code" class="qr-code"
@@ -602,11 +622,16 @@ export class WalletConnector {
                                 <p style="color: #ffc107; margin-top: 1rem; font-size: 0.9rem;">
                                     ⏳ Waiting for signature...
                                 </p>
+                                ${isSequentialBatch && current < total ? `
+                                <p style="color: #888; font-size: 0.8rem; margin-top: 0.5rem;">
+                                    After signing, the next transaction will appear automatically.
+                                </p>
+                                ` : ''}
                             </div>
                         </div>
                         <div class="actions">
                             <button class="btn btn-secondary" onclick="this.closest('.signing-modal').remove()">
-                                ❌ Cancel
+                                ❌ Cancel ${isSequentialBatch ? 'Batch' : 'Transaction'}
                             </button>
                         </div>
                     </div>
@@ -817,6 +842,54 @@ export class WalletConnector {
             .signing-modal {
                 z-index: 10001;
             }
+
+            .batch-progress {
+                margin-bottom: 1.5rem;
+                text-align: center;
+            }
+
+            .progress-bar {
+                width: 100%;
+                height: 8px;
+                background: #333;
+                border-radius: 4px;
+                overflow: hidden;
+                margin: 1rem 0;
+            }
+
+            .progress-fill {
+                height: 100%;
+                background: linear-gradient(90deg, #ffc107, #ffab00);
+                border-radius: 4px;
+                transition: width 0.3s ease;
+            }
+
+            .progress-text {
+                font-size: 0.9rem;
+                color: #ffc107;
+                font-weight: 500;
+                margin-bottom: 0.5rem;
+            }
+
+            .batch-info {
+                background: rgba(255, 193, 7, 0.1);
+                border: 1px solid rgba(255, 193, 7, 0.3);
+                border-radius: 6px;
+                padding: 1rem;
+                margin: 1rem 0;
+                text-align: left;
+            }
+
+            .batch-info p {
+                margin: 0.25rem 0;
+                font-size: 0.85rem;
+                color: #ccc;
+            }
+
+            .batch-info p:first-child {
+                color: #ffc107;
+                font-weight: 500;
+            }
         `;
         document.head.appendChild(style);
     }
@@ -858,9 +931,22 @@ export class WalletConnector {
                 return await this.createXamanPayload(transactions[0], { submit: true });
             }
 
-            // For multiple transactions, we need to create them individually but show as batch
-            // This is a limitation of Xaman - it doesn't support true batch transactions
-            console.log('📄 Multiple transactions - creating individual payloads in sequence');
+            // Try true XLS-56 batch transaction first (if backend supports it)
+            try {
+                console.log('🚀 Attempting true XLS-56 batch transaction...');
+                const batchPayload = await this.createTrueBatchPayload(transactions);
+                if (batchPayload && batchPayload.uuid) {
+                    console.log('✅ True batch transaction created successfully!');
+                    batchPayload.isTrueBatch = true;
+                    batchPayload.totalTransactions = transactions.length;
+                    return batchPayload;
+                }
+            } catch (error) {
+                console.warn('⚠️ True batch transaction not supported, falling back to sequential:', error.message);
+            }
+
+            // Fallback to sequential processing with enhanced UX
+            console.log('🔄 Using sequential transaction processing with batch presentation');
             
             // Store transactions for sequential processing
             this.batchTransactions = transactions;
@@ -871,7 +957,7 @@ export class WalletConnector {
             const firstTxPayload = await this.createXamanPayload(transactions[0], { submit: true });
             
             // Mark this as a batch operation
-            firstTxPayload.isBatch = true;
+            firstTxPayload.isSequentialBatch = true;
             firstTxPayload.totalTransactions = transactions.length;
             firstTxPayload.currentTransaction = 1;
             firstTxPayload.batchId = `batch-${Date.now()}-${Math.random().toString(36).substr(2)}`;
@@ -881,6 +967,46 @@ export class WalletConnector {
             
         } catch (error) {
             console.error('❌ Failed to create batch orders:', error);
+            throw error;
+        }
+    }
+
+    async createTrueBatchPayload(transactions) {
+        console.log('🧪 Attempting true XLS-56 batch transaction...');
+        
+        // Try backend API for true batch support
+        try {
+            const batchPayload = {
+                txjson: transactions, // Array of transactions for XLS-56
+                options: {
+                    submit: true,
+                    expire: 10, // Longer timeout for batch
+                    batch: true // Flag for backend to know this is a batch
+                }
+            };
+
+            const response = await fetch(`${this.backendUrl}/create-batch-payload`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(batchPayload)
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                console.log('✅ True batch payload created via backend:', result.uuid);
+                return result;
+            } else {
+                const errorText = await response.text();
+                throw new Error(`Backend batch API error: ${response.status} - ${errorText}`);
+            }
+        } catch (error) {
+            console.log('⚠️ Backend batch API not available:', error.message);
+            // Try direct API if credentials available
+            if (this.apiKey && this.apiSecret) {
+                return await this.createDirectBatchPayload(transactions);
+            }
             throw error;
         }
     }

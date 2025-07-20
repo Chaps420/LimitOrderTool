@@ -55,6 +55,29 @@ body {
     gap: 1.5rem;
 }
 
+.wallet-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.wallet-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(255, 193, 7, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.wallet-address {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    color: #ffc107;
+    font-weight: 500;
+}
+
 .wallet-balances {
     display: flex;
     gap: 1rem;

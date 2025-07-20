@@ -19,9 +19,17 @@
                         <span class="status-dot"></span>
                         <span class="status-text">Connecting...</span>
                     </div>
-                    <button class="btn btn-primary" id="connectWallet">
-                        Connect Wallet
-                    </button>
+                    <div class="wallet-controls">
+                        <button class="btn btn-primary" id="connectWallet">
+                            Connect Wallet
+                        </button>
+                        <button class="btn btn-secondary" id="disconnectWallet" style="display: none;">
+                            🔌 Disconnect
+                        </button>
+                        <div class="wallet-info" id="walletInfo" style="display: none;">
+                            <span class="wallet-address" id="walletAddress"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </header>
@@ -31,13 +39,13 @@
             <div class="container">
                 <!-- Hero Section -->
                 <section class="hero">
-                    <h2>XLS-56 Batch Limit Orders</h2>
-                    <p>Create up to 8 limit sell orders with a single signature using XRPL's new batch transaction feature</p>
+                    <h2>XRPL Sequential Batch Orders</h2>
+                    <p>Create multiple limit sell orders with streamlined sequential signing via Xaman wallet</p>
                     <div class="hero-features">
-                        <span class="feature">✅ Single Signature</span>
-                        <span class="feature">⚡ Atomic Execution</span>
-                        <span class="feature">💰 Lower Fees</span>
-                        <span class="feature">🔒 XLS-56 Standard</span>
+                        <span class="feature">⚡ Sequential Processing</span>
+                        <span class="feature">🔒 Individual Security</span>
+                        <span class="feature">💰 Batch Management</span>
+                        <span class="feature">� Mobile Optimized</span>
                     </div>
                 </section>
 
@@ -91,7 +99,7 @@
                                     <div class="form-group">
                                         <label for="orderCount">Number of Orders</label>
                                         <input type="number" id="orderCount" placeholder="5" min="1" max="8" class="form-control">
-                                        <small class="form-help">XLS-56 Batch: 1-8 orders per transaction</small>
+                                        <small class="form-help">Sequential batch: 1-8 orders (each signed individually)</small>
                                     </div>
 
                                     <div class="form-group">

@@ -60,6 +60,11 @@ class App {
             this.connectWallet();
         });
 
+        // Wallet disconnection
+        document.getElementById('disconnectWallet').addEventListener('click', () => {
+            this.disconnectWallet();
+        });
+
         // Token selection
         document.getElementById('tokenSelect').addEventListener('change', (e) => {
             this.handleTokenSelection(e.target.value);
@@ -241,11 +246,14 @@ class App {
     }
 
     async onWalletConnected(address) {
-        const button = document.getElementById('connectWallet');
+        // Update UI elements
+        document.getElementById('connectWallet').style.display = 'none';
+        document.getElementById('disconnectWallet').style.display = 'block';
         
-        button.textContent = `${address.substring(0, 8)}...${address.substring(address.length - 8)}`;
-        button.classList.add('connected');
-        button.disabled = false;
+        const walletInfo = document.getElementById('walletInfo');
+        const walletAddress = document.getElementById('walletAddress');
+        walletAddress.textContent = `${address.substring(0, 8)}...${address.substring(address.length - 8)}`;
+        walletInfo.style.display = 'flex';
         
         this.updateNetworkStatus('connected', `Wallet Connected: ${address.substring(0, 12)}...`);
         
@@ -256,6 +264,51 @@ class App {
         console.log('✅ Wallet balance loaded, enabling order creation');
         // Enable order creation
         this.enableOrderCreation();
+    }
+
+    disconnectWallet() {
+        // Disconnect from wallet connector
+        if (this.walletConnector) {
+            this.walletConnector.disconnect();
+        }
+        
+        // Clear wallet data
+        this.walletAddress = null;
+        
+        // Clear localStorage
+        localStorage.removeItem('xrpl-wallet-address');
+        localStorage.removeItem('xrpl-wallet-type');
+        console.log('🗑️ Wallet info cleared from localStorage');
+        
+        // Update UI
+        document.getElementById('connectWallet').style.display = 'block';
+        document.getElementById('disconnectWallet').style.display = 'none';
+        document.getElementById('walletInfo').style.display = 'none';
+        
+        this.updateNetworkStatus('disconnected', 'Wallet Disconnected');
+        
+        // Disable order creation
+        this.disableOrderCreation();
+        
+        // Clear any existing orders
+        this.orders = [];
+        this.updateOrdersDisplay();
+        
+        console.log('🔌 Wallet disconnected successfully');
+    }
+
+    disableOrderCreation() {
+        // Disable order creation buttons
+        document.getElementById('calculateOrders').disabled = true;
+        document.getElementById('createOrders').disabled = true;
+        document.getElementById('signTransaction').disabled = true;
+        
+        // Clear token selection
+        const tokenSelect = document.getElementById('tokenSelect');
+        tokenSelect.innerHTML = `
+            <option value="">Select a token...</option>
+            <option value="custom">Custom Token</option>
+        `;
     }
 
     async loadWalletBalance() {
