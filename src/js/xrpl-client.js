@@ -1,0 +1,324 @@
+import { Client } from 'xrpl';
+
+export class XRPLClient {
+    constructor() {
+        this.client = null;
+        this.isConnected = false;
+        this.serverUrl = 'wss://xrplcluster.com/';
+    }
+
+    async connect() {
+        try {
+            this.client = new Client(this.serverUrl);
+            await this.client.connect();
+            this.isConnected = true;
+            console.log('Connected to XRPL');
+            return true;
+        } catch (error) {
+            console.error('Failed to connect to XRPL:', error);
+            throw error;
+        }
+    }
+
+    async disconnect() {
+        if (this.client && this.isConnected) {
+            await this.client.disconnect();
+            this.isConnected = false;
+        }
+    }
+
+    async getAccountInfo(address) {
+        if (!this.isConnected) {
+            throw new Error('Not connected to XRPL');
+        }
+
+        try {
+            const accountInfo = await this.client.request({
+                command: 'account_info',
+                account: address,
+                ledger_index: 'validated'
+            });
+            
+            return accountInfo.result.account_data;
+        } catch (error) {
+            console.error('Error getting account info:', error);
+            throw error;
+        }
+    }
+
+    async getNextSequence(address) {
+        try {
+            const accountInfo = await this.getAccountInfo(address);
+            return accountInfo.Sequence;
+        } catch (error) {
+            console.error('Error getting sequence:', error);
+            throw error;
+        }
+    }
+
+    async getCurrentLedgerIndex() {
+        if (!this.isConnected) {
+            throw new Error('Not connected to XRPL');
+        }
+
+        try {
+            const ledger = await this.client.request({
+                command: 'ledger',
+                ledger_index: 'validated'
+            });
+            
+            return ledger.result.ledger_index;
+        } catch (error) {
+            console.error('Error getting ledger index:', error);
+            throw error;
+        }
+    }
+
+    async submitTransactions(signedTransactions) {
+        if (!this.isConnected) {
+            throw new Error('Not connected to XRPL');
+        }
+
+        const results = [];
+
+        try {
+            for (const signedTx of signedTransactions) {
+                try {
+                    const result = await this.client.request({
+                        command: 'submit',
+                        tx_blob: signedTx
+                    });
+
+                    results.push({
+                        success: result.result.engine_result === 'tesSUCCESS',
+                        hash: result.result.tx_json?.hash,
+                        result: result.result.engine_result,
+                        message: result.result.engine_result_message
+                    });
+
+                    // Add delay between submissions to avoid rate limiting
+                    if (signedTransactions.length > 1) {
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+
+                } catch (error) {
+                    results.push({
+                        success: false,
+                        error: error.message
+                    });
+                }
+            }
+
+            const successCount = results.filter(r => r.success).length;
+            const failCount = results.length - successCount;
+
+            return {
+                success: successCount > 0,
+                results,
+                summary: {
+                    total: results.length,
+                    successful: successCount,
+                    failed: failCount
+                }
+            };
+
+        } catch (error) {
+            console.error('Error submitting transactions:', error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    async getOrderbook(takerPays, takerGets, limit = 20) {
+        if (!this.isConnected) {
+            throw new Error('Not connected to XRPL');
+        }
+
+        try {
+            const orderbook = await this.client.request({
+                command: 'book_offers',
+                taker_pays: takerPays,
+                taker_gets: takerGets,
+                limit: limit
+            });
+
+            return orderbook.result.offers;
+        } catch (error) {
+            console.error('Error getting orderbook:', error);
+            throw error;
+        }
+    }
+
+    async getTokenMetadata(currency, issuer) {
+        // This would typically fetch token metadata from a reliable source
+        // For now, return basic structure
+        return {
+            currency,
+            issuer,
+            symbol: currency,
+            decimals: 6, // Most XRPL tokens use 6 decimals
+            totalSupply: null // Would need to be fetched from issuer or external source
+        };
+    }
+
+    formatCurrencyAmount(amount, currency, issuer = null) {
+        if (currency === 'XRP') {
+            // XRP is in drops (1 XRP = 1,000,000 drops)
+            return (parseFloat(amount) * 1000000).toString();
+        } else {
+            // Other currencies
+            return {
+                currency: currency,
+                issuer: issuer,
+                value: amount.toString()
+            };
+        }
+    }
+
+    parseAmount(amount) {
+        if (typeof amount === 'string') {
+            // XRP amount in drops
+            return parseFloat(amount) / 1000000;
+        } else {
+            // IOU amount
+            return parseFloat(amount.value);
+        }
+    }
+
+    async validateAddress(address) {
+        try {
+            // Basic validation - XRPL addresses start with 'r' and are 25-34 characters
+            if (!address.startsWith('r') || address.length < 25 || address.length > 34) {
+                return false;
+            }
+
+            // Try to get account info to see if address exists
+            await this.getAccountInfo(address);
+            return true;
+        } catch (error) {
+            // If account doesn't exist or other error, address might still be valid
+            // but unfunded. For limit orders, this is typically fine.
+            return address.match(/^r[a-zA-Z0-9]{24,33}$/);
+        }
+    }
+
+    async estimateNetworkFee() {
+        try {
+            const serverInfo = await this.client.request({
+                command: 'server_info'
+            });
+
+            const baseFee = serverInfo.result.info?.validated_ledger?.base_fee_xrp;
+            const reserveBase = serverInfo.result.info?.validated_ledger?.reserve_base_xrp;
+            const reserveInc = serverInfo.result.info?.validated_ledger?.reserve_inc_xrp;
+
+            return {
+                baseFee: baseFee ? parseFloat(baseFee) : 0.000012, // Default to 12 drops
+                reserveBase: reserveBase ? parseFloat(reserveBase) : 10,
+                reserveIncrement: reserveInc ? parseFloat(reserveInc) : 2
+            };
+        } catch (error) {
+            console.warn('Could not get network fees, using defaults:', error);
+            return {
+                baseFee: 0.000012,
+                reserveBase: 10,
+                reserveIncrement: 2
+            };
+        }
+    }
+
+    async checkAccountExists(address) {
+        try {
+            await this.getAccountInfo(address);
+            return true;
+        } catch (error) {
+            if (error.data?.error === 'actNotFound') {
+                return false;
+            }
+            throw error;
+        }
+    }
+
+    // Utility method to convert human-readable amounts to XRPL format
+    convertToXRPLAmount(amount, currency, issuer) {
+        if (currency === 'XRP') {
+            return (parseFloat(amount) * 1000000).toString();
+        }
+        
+        return {
+            currency: currency.padEnd(3).substring(0, 3).toUpperCase(),
+            issuer: issuer,
+            value: amount.toString()
+        };
+    }
+
+    async getCurrentPrice(baseCurrency, baseIssuer, quoteCurrency, quoteIssuer) {
+        try {
+            const takerPays = quoteCurrency === 'XRP' 
+                ? 'XRP' 
+                : { currency: quoteCurrency, issuer: quoteIssuer };
+                
+            const takerGets = baseCurrency === 'XRP' 
+                ? 'XRP' 
+                : { currency: baseCurrency, issuer: baseIssuer };
+
+            const offers = await this.getOrderbook(takerPays, takerGets, 1);
+            
+            if (offers && offers.length > 0) {
+                const topOffer = offers[0];
+                const pays = this.parseAmount(topOffer.TakerPays);
+                const gets = this.parseAmount(topOffer.TakerGets);
+                return pays / gets;
+            }
+            
+            return null;
+        } catch (error) {
+            console.error('Error getting current price:', error);
+            return null;
+        }
+    }
+
+    async getTokenBalances(address) {
+        if (!this.isConnected) {
+            throw new Error('Not connected to XRPL');
+        }
+
+        try {
+            console.log('🔍 Requesting account_lines for:', address);
+            const response = await this.client.request({
+                command: 'account_lines',
+                account: address,
+                ledger_index: 'validated'
+            });
+            
+            console.log('📋 Raw XRPL account_lines response:', response);
+            console.log('📊 Lines data:', response.result.lines);
+            
+            return response.result.lines || [];
+        } catch (error) {
+            console.error('Error getting token balances:', error);
+            return [];
+        }
+    }
+
+    async getAccountOffers(address) {
+        if (!this.isConnected) {
+            throw new Error('Not connected to XRPL');
+        }
+
+        try {
+            const response = await this.client.request({
+                command: 'account_offers',
+                account: address,
+                ledger_index: 'validated'
+            });
+            
+            return response.result.offers || [];
+        } catch (error) {
+            console.error('Error getting account offers:', error);
+            return [];
+        }
+    }
+}

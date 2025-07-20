@@ -1,0 +1,21 @@
+{
+  "name": "xrpl-limit-order-tool",
+  "version": "1.0.0",
+  "description": "XRPL limit order tool with market cap distribution and batch signing",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": ["xrpl", "crypto", "trading", "limit-orders", "xaman"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "xrpl": "^3.0.0",
+    "qrcode": "^1.5.3"
+  }
+}

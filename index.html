@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XRPL Limit Order Tool</title>
+    <link rel="stylesheet" href="./src/css/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>XRPL<span class="accent">Trader</span></h1>
+                </div>
+                <div class="header-actions">
+                    <div class="network-status" id="networkStatus">
+                        <span class="status-dot"></span>
+                        <span class="status-text">Connecting...</span>
+                    </div>
+                    <button class="btn btn-primary" id="connectWallet">
+                        Connect Wallet
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="container">
+                <!-- Hero Section -->
+                <section class="hero">
+                    <h2>XLS-56 Batch Limit Orders</h2>
+                    <p>Create up to 8 limit sell orders with a single signature using XRPL's new batch transaction feature</p>
+                    <div class="hero-features">
+                        <span class="feature">✅ Single Signature</span>
+                        <span class="feature">⚡ Atomic Execution</span>
+                        <span class="feature">💰 Lower Fees</span>
+                        <span class="feature">🔒 XLS-56 Standard</span>
+                    </div>
+                </section>
+
+                <!-- Strategy Selector -->
+                <section class="strategy-section">
+                    <div class="section-header">
+                        <h3>Order Strategy</h3>
+                    </div>
+                    
+                    <div class="strategy-tabs">
+                        <button class="tab-btn active" data-strategy="market-cap">Market Cap Distribution</button>
+                        <button class="tab-btn" data-strategy="manual">Manual Orders</button>
+                    </div>
+
+                    <!-- Market Cap Strategy -->
+                    <div class="strategy-content active" id="marketCapStrategy">
+                        <div class="card">
+                            <div class="card-header">
+                                <h4>Distribution Settings</h4>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label for="tokenSelect">Select Token</label>
+                                        <select id="tokenSelect" class="form-control">
+                                            <option value="">Choose a token...</option>
+                                            <option value="custom">Enter Custom Token</option>
+                                        </select>
+                                        <div class="custom-token-input" id="customTokenInput" style="display: none;">
+                                            <input type="text" id="customTokenCode" placeholder="Token Code" class="form-control">
+                                            <input type="text" id="customTokenIssuer" placeholder="Token Issuer Address" class="form-control">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="tokenSupply">Total Token Supply</label>
+                                        <input type="number" id="tokenSupply" placeholder="1,000,000,000" class="form-control">
+                                        <small class="form-help">Enter the total supply of tokens (not your personal balance)</small>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="bottomMarketCap">Bottom Market Cap ($)</label>
+                                        <input type="number" id="bottomMarketCap" placeholder="1,000,000" class="form-control">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="topMarketCap">Top Market Cap ($)</label>
+                                        <input type="number" id="topMarketCap" placeholder="10,000,000" class="form-control">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="orderCount">Number of Orders</label>
+                                        <input type="number" id="orderCount" placeholder="5" min="1" max="8" class="form-control">
+                                        <small class="form-help">XLS-56 Batch: 1-8 orders per transaction</small>
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label for="totalTokens">Total Token Amount</label>
+                                        <input type="number" id="totalTokens" placeholder="1,000,000" class="form-control">
+                                    </div>
+                                </div>
+
+                                <div class="form-actions">
+                                    <button class="btn btn-secondary" id="calculateOrders">Calculate Orders</button>
+                                    <button class="btn btn-primary" id="createOrders" disabled>Create Orders</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Manual Strategy -->
+                    <div class="strategy-content" id="manualStrategy">
+                        <div class="card">
+                            <div class="card-header">
+                                <h4>Manual Order Entry</h4>
+                                <div class="batch-counter">
+                                    <span id="manualOrderCount">0</span>/8 orders
+                                </div>
+                                <button class="btn btn-small" id="addOrder">+ Add Order</button>
+                            </div>
+                            <div class="card-body">
+                                <div id="manualOrdersList" class="manual-orders-list">
+                                    <!-- Manual orders will be added here -->
+                                </div>
+                                
+                                <div class="form-actions">
+                                    <button class="btn btn-secondary" id="calculateManualOrders">Calculate Orders</button>
+                                    <button class="btn btn-primary" id="createManualOrders" disabled>Create Orders</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Order Preview -->
+                <section class="preview-section" id="previewSection" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4>XLS-56 Batch Transaction Preview</h4>
+                            <div class="preview-stats">
+                                <span class="stat">
+                                    <span class="stat-label">Orders in Batch:</span>
+                                    <span class="stat-value" id="totalOrdersCount">0</span>
+                                </span>
+                                <span class="stat">
+                                    <span class="stat-label">Expected XRP:</span>
+                                    <span class="stat-value" id="totalXRPExpected">0</span>
+                                </span>
+                                <span class="stat">
+                                    <span class="stat-label">Batch Fee:</span>
+                                    <span class="stat-value" id="batchFee">0 drops</span>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="orders-table-container">
+                                <table class="orders-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Order #</th>
+                                            <th>Price (XRP)</th>
+                                            <th>Amount (Tokens)</th>
+                                            <th>Market Cap</th>
+                                            <th>Total XRP</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ordersPreviewBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="preview-actions">
+                                <button class="btn btn-primary btn-large" id="signTransaction">
+                                    Sign Transaction with Xaman
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Transaction Status -->
+                <section class="status-section" id="statusSection" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4>Transaction Status</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="status-display" id="statusDisplay">
+                                <!-- Status updates will appear here -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Admin Status Panel (for testing) -->
+                <section class="status-panel" style="background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 1rem; margin-top: 2rem;">
+                    <h3 style="color: #ffc107; margin: 0 0 1rem 0;">🔧 System Status</h3>
+                    <div id="system-status">
+                        <p>📡 Frontend: <span style="color: #28a745;">Running on localhost:3001</span></p>
+                        <p>🔐 Backend: <span id="backend-status" style="color: #6c757d;">Checking...</span></p>
+                        <p>🌐 Mode: <span id="api-mode" style="color: #ffc107;">Production (Real Xaman API)</span></p>
+                        <p>💡 Credentials: <span style="color: #28a745;">Secured in Backend Environment</span></p>
+                        <p>🚀 Ready to use with live wallet!</p>
+                        <div style="margin-top: 1rem;">
+                            <button id="testLiveConnection" class="btn btn-secondary" style="font-size: 0.9rem; padding: 0.5rem 1rem;">
+                                🧪 Test Live Wallet Connection
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="./src/js/app.js"></script>
+</body>
+</html>
