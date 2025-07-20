@@ -899,13 +899,8 @@ export class WalletConnector {
             console.log('� Creating XLS-56 batch transaction for', orders.length, 'orders');
             console.log('� Orders to process:', orders);
 
-            // Validate batch size (XLS-56 allows up to 8 transactions)
-            if (orders.length > 8) {
-                throw new Error('Batch size cannot exceed 8 transactions (XLS-56 limitation)');
-            }
-
             if (orders.length === 0) {
-                throw new Error('Cannot create empty batch transaction');
+                throw new Error('Cannot create empty order set');
             }
 
             // Transform orders into proper XRPL transaction format

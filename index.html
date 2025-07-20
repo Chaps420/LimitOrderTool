@@ -1,9 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
+<head                        <section class="hero">
+                    <h2>XRPL Grid Trading Bot</h2>
+                    <p>Create multiple limit sell orders with intelligent market distribution across price ranges</p>
+                    <div class="hero-features">
+                        <span class="feature">📊 Grid Strategy</span>
+                        <span class="feature">🎯 Smart Distribution</span>
+                        <span class="feature">💰 Multiple Orders</span>
+                        <span class="feature">📱 Mobile Optimized</span>
+                    </div>
+                </section>ection class="hero">
+                    <h2>XRPL Grid Trading Bot</h2>
+                    <p>Create multiple limit sell orders with intelligent market distribution across price ranges</p>
+                    <div class="hero-features">
+                        <span class="feature">📊 Grid Strategy</span>
+                        <span class="feature">🎯 Smart Distribution</span>
+                        <span class="feature">💰 Multiple Orders</span>
+                        <span class="feature">📱 Mobile Optimized</span>
+                    </div>
+                </section>ta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XRPL Limit Order Tool</title>
+    <title>GridTrader - XRPL Grid Trading Bot</title>
     <link rel="stylesheet" href="./src/css/styles.css">
 </head>
 <body>
@@ -12,7 +29,7 @@
         <header class="header">
             <div class="header-content">
                 <div class="logo">
-                    <h1>XRPL<span class="accent">Trader</span></h1>
+                    <h1>Grid<span class="accent">Trader</span></h1>
                 </div>
                 <div class="header-actions">
                     <div class="network-status" id="networkStatus">
@@ -56,7 +73,7 @@
                     </div>
                     
                     <div class="strategy-tabs">
-                        <button class="tab-btn active" data-strategy="market-cap">Market Cap Distribution</button>
+                        <button class="tab-btn active" data-strategy="market-cap">Grid Distribution</button>
                         <button class="tab-btn" data-strategy="manual">Manual Orders</button>
                     </div>
 
@@ -64,7 +81,10 @@
                     <div class="strategy-content active" id="marketCapStrategy">
                         <div class="card">
                             <div class="card-header">
-                                <h4>Distribution Settings</h4>
+                                <h4>📊 Grid Distribution Settings</h4>
+                                <div class="card-description">
+                                    <p>Automatically distribute your sell orders across a price range using market cap calculations</p>
+                                </div>
                             </div>
                             <div class="card-body">
                                 <div class="form-grid">
@@ -89,22 +109,25 @@
                                     <div class="form-group">
                                         <label for="bottomMarketCap">Bottom Market Cap ($)</label>
                                         <input type="number" id="bottomMarketCap" placeholder="1,000,000" class="form-control">
+                                        <small class="form-help">Starting market cap for price range</small>
                                     </div>
 
                                     <div class="form-group">
                                         <label for="topMarketCap">Top Market Cap ($)</label>
                                         <input type="number" id="topMarketCap" placeholder="10,000,000" class="form-control">
+                                        <small class="form-help">Target market cap for price range</small>
                                     </div>
 
                                     <div class="form-group">
-                                        <label for="orderCount">Number of Orders</label>
-                                        <input type="number" id="orderCount" placeholder="5" min="1" max="8" class="form-control">
-                                        <small class="form-help">Sequential batch: 1-8 orders (each signed individually)</small>
+                                        <label for="orderCount">Number of Grid Levels</label>
+                                        <input type="number" id="orderCount" placeholder="10" min="1" class="form-control">
+                                        <small class="form-help">How many orders to create across the price range</small>
                                     </div>
 
                                     <div class="form-group">
                                         <label for="totalTokens">Total Token Amount</label>
                                         <input type="number" id="totalTokens" placeholder="1,000,000" class="form-control">
+                                        <small class="form-help">Total amount of tokens to distribute across all orders</small>
                                     </div>
                                 </div>
 
@@ -120,11 +143,16 @@
                     <div class="strategy-content" id="manualStrategy">
                         <div class="card">
                             <div class="card-header">
-                                <h4>Manual Order Entry</h4>
-                                <div class="batch-counter">
-                                    <span id="manualOrderCount">0</span>/8 orders
+                                <h4>📝 Manual Order Entry</h4>
+                                <div class="card-description">
+                                    <p>Manually specify individual sell orders with custom prices and amounts</p>
                                 </div>
-                                <button class="btn btn-small" id="addOrder">+ Add Order</button>
+                                <div class="manual-header-actions">
+                                    <div class="batch-counter">
+                                        <span id="manualOrderCount">0</span> orders
+                                    </div>
+                                    <button class="btn btn-small" id="addOrder">+ Add Order</button>
+                                </div>
                             </div>
                             <div class="card-body">
                                 <div id="manualOrdersList" class="manual-orders-list">
