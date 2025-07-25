@@ -1,5 +1,5 @@
 import { XRPLClient } from './xrpl-client.js';
-import { WalletConnector } from './wallet-connector-xls56.js';
+import { WalletConnector } from './wallet-connector-real.js';
 import { OrderManager } from './order-manager.js';
 
 class App {
@@ -28,7 +28,7 @@ class App {
         const savedWalletAddress = localStorage.getItem('xrpl-wallet-address');
         const savedWalletType = localStorage.getItem('xrpl-wallet-type');
         
-        if (savedWalletAddress && savedWalletType) {
+        if (savedWalletAddress && savedWalletType && savedWalletAddress !== 'null' && this.isValidXRPLAddress(savedWalletAddress)) {
             console.log('🔄 Found saved wallet, attempting to reconnect:', savedWalletAddress);
             
             // Set wallet as connected (user doesn't need to scan QR again)
@@ -41,6 +41,10 @@ class App {
             this.onWalletConnected(savedWalletAddress);
             
             console.log('✅ Wallet reconnected automatically');
+        } else if (savedWalletAddress) {
+            console.log('🗑️ Clearing invalid saved wallet data:', savedWalletAddress);
+            localStorage.removeItem('xrpl-wallet-address');
+            localStorage.removeItem('xrpl-wallet-type');
         }
         
         // Check backend status for admin
@@ -56,49 +60,76 @@ class App {
         });
 
         // Wallet connection
-        document.getElementById('connectWallet').addEventListener('click', () => {
-            this.connectWallet();
-        });
+        const connectWalletBtn = document.getElementById('connectWallet');
+        if (connectWalletBtn) {
+            connectWalletBtn.addEventListener('click', () => {
+                this.connectWallet();
+            });
+        }
 
         // Wallet disconnection
-        document.getElementById('disconnectWallet').addEventListener('click', () => {
-            this.disconnectWallet();
-        });
+        const disconnectWalletBtn = document.getElementById('disconnectWallet');
+        if (disconnectWalletBtn) {
+            disconnectWalletBtn.addEventListener('click', () => {
+                this.disconnectWallet();
+            });
+        }
 
         // Token selection
-        document.getElementById('tokenSelect').addEventListener('change', (e) => {
-            this.handleTokenSelection(e.target.value);
-        });
+        const tokenSelect = document.getElementById('tokenSelect');
+        if (tokenSelect) {
+            tokenSelect.addEventListener('change', (e) => {
+                this.handleTokenSelection(e.target.value);
+            });
+        }
 
         // Calculate orders
-        document.getElementById('calculateOrders').addEventListener('click', () => {
-            this.calculateOrders();
-        });
+        const calculateOrdersBtn = document.getElementById('calculateOrders');
+        if (calculateOrdersBtn) {
+            calculateOrdersBtn.addEventListener('click', () => {
+                this.calculateOrders();
+            });
+        }
 
         // Create orders
-        document.getElementById('createOrders').addEventListener('click', () => {
-            this.createOrders();
-        });
+        const createOrdersBtn = document.getElementById('createOrders');
+        if (createOrdersBtn) {
+            createOrdersBtn.addEventListener('click', () => {
+                this.createOrders();
+            });
+        }
 
         // Sign transaction
-        document.getElementById('signTransaction').addEventListener('click', () => {
-            this.signTransaction();
-        });
+        const signTransactionBtn = document.getElementById('signTransaction');
+        if (signTransactionBtn) {
+            signTransactionBtn.addEventListener('click', () => {
+                this.signTransaction();
+            });
+        }
 
         // Add manual order
-        document.getElementById('addOrder').addEventListener('click', () => {
-            this.addManualOrder();
-        });
+        const addOrderBtn = document.getElementById('addOrder');
+        if (addOrderBtn) {
+            addOrderBtn.addEventListener('click', () => {
+                this.addManualOrder();
+            });
+        }
 
         // Calculate manual orders
-        document.getElementById('calculateManualOrders').addEventListener('click', () => {
-            this.calculateManualOrders();
-        });
+        const calculateManualOrdersBtn = document.getElementById('calculateManualOrders');
+        if (calculateManualOrdersBtn) {
+            calculateManualOrdersBtn.addEventListener('click', () => {
+                this.calculateManualOrders();
+            });
+        }
 
         // Create manual orders
-        document.getElementById('createManualOrders').addEventListener('click', () => {
-            this.createManualOrders();
-        });
+        const createManualOrdersBtn = document.getElementById('createManualOrders');
+        if (createManualOrdersBtn) {
+            createManualOrdersBtn.addEventListener('click', () => {
+                this.createManualOrders();
+            });
+        }
 
         // Test live connection (admin feature)
         const testBtn = document.getElementById('testLiveConnection');
@@ -246,6 +277,15 @@ class App {
     }
 
     async onWalletConnected(address) {
+        // Validate address before proceeding
+        if (!address || typeof address !== 'string') {
+            console.warn('Invalid wallet address received:', address);
+            return;
+        }
+        
+        // Set the wallet address in the app
+        this.walletAddress = address;
+        
         // Update UI elements
         document.getElementById('connectWallet').style.display = 'none';
         document.getElementById('disconnectWallet').style.display = 'block';
@@ -721,7 +761,9 @@ class App {
                 const orders = [];
                 orderRows.forEach((row, index) => {
                     const cells = row.cells;
-                    const quantity = parseFloat(cells[2].textContent);
+                    // Remove commas from quantity and parse correctly
+                    const quantityText = cells[2].textContent.replace(/,/g, '');
+                    const quantity = parseFloat(quantityText);
                     const totalXrpText = cells[4].textContent.replace(' XRP', '').replace(',', '');
                     const totalXrp = parseFloat(totalXrpText);
                     
@@ -736,8 +778,7 @@ class App {
                             currency: currency,
                             issuer: issuer,
                             value: quantity.toString()
-                        }, // Tokens (what we're selling)
-                        sequence: index + 1
+                        } // Tokens (what we're selling) - remove sequence as XRPL will set it
                     });
                 });
                 
@@ -750,7 +791,29 @@ class App {
                     
                     const result = await this.walletConnector.createBatchOrders(this.walletAddress, orders);
                     
-                    if (result && result.uuid) {
+                    // Check if this is a sequential signing result (new behavior)
+                    if (result && result.success && result.signedTransactions) {
+                        this.showStatus(`✅ ${result.signedTransactions.length} limit orders created successfully!`, 'success');
+                        console.log('🎉 Sequential transactions signed successfully!');
+                        
+                        // Clear the order preview
+                        if (previewBody) {
+                            previewBody.innerHTML = '';
+                        }
+                        if (previewSection) {
+                            previewSection.style.display = 'none';
+                        }
+                        
+                        // Update transaction status
+                        this.updateTransactionStatus(`✅ ${result.signedTransactions.length} transactions completed successfully!`, 'success');
+                        
+                        // Reset form after successful submission
+                        setTimeout(() => {
+                            this.resetForm();
+                        }, 3000);
+                        
+                    } else if (result && result.uuid) {
+                        // This is the old batch behavior (if true batching were to work)
                         this.showStatus('Batch transaction created. Opening Xaman for single signature...');
                         console.log('✅ Batch payload created, waiting for signature...');
                         
@@ -1085,6 +1148,34 @@ class App {
         text.textContent = message;
     }
 
+    updateOrdersDisplay() {
+        // Clear manual orders list
+        const manualOrdersList = document.getElementById('manualOrdersList');
+        if (manualOrdersList) {
+            manualOrdersList.innerHTML = '<!-- Manual orders will be added here -->';
+        }
+
+        // Clear orders preview
+        const ordersPreviewBody = document.getElementById('ordersPreviewBody');
+        if (ordersPreviewBody) {
+            ordersPreviewBody.innerHTML = '';
+        }
+
+        // Hide preview section
+        const previewSection = document.getElementById('previewSection');
+        if (previewSection) {
+            previewSection.style.display = 'none';
+        }
+
+        // Reset preview stats
+        const totalOrdersCount = document.getElementById('totalOrdersCount');
+        const totalXRPExpected = document.getElementById('totalXRPExpected');
+        if (totalOrdersCount) totalOrdersCount.textContent = '0';
+        if (totalXRPExpected) totalXRPExpected.textContent = '0';
+
+        console.log('🧹 Orders display cleared');
+    }
+
     showStatus(message, type = 'pending') {
         const statusSection = document.getElementById('statusSection');
         const statusDisplay = document.getElementById('statusDisplay');
@@ -1220,6 +1311,21 @@ class App {
             totalTokensInput.title = '';
         }
     }
+
+    // Helper method to validate XRPL addresses
+    isValidXRPLAddress(address) {
+        if (!address || typeof address !== 'string') {
+            return false;
+        }
+        
+        // XRPL classic addresses start with 'r' and are 25-34 characters long
+        const classicAddressRegex = /^r[a-zA-Z0-9]{24,33}$/;
+        
+        // XRPL X-Addresses start with 'X' and are longer
+        const xAddressRegex = /^X[a-zA-Z0-9]{46,47}$/;
+        
+        return classicAddressRegex.test(address) || xAddressRegex.test(address);
+    }
 }
 
 // Initialize the app when DOM is loaded
@@ -1227,4 +1333,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const app = new App();
     // Make app globally available for manual order management
     window.app = app;
+    
+    // Debug function to test QR modal
+    window.testQRModal = () => {
+        if (app.walletConnector) {
+            app.walletConnector.testQRModal();
+        } else {
+            console.error('❌ Wallet connector not available');
+        }
+    };
 });
