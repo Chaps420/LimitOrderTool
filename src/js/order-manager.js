@@ -2,32 +2,85 @@ export class OrderManager {
     constructor() {
         this.orders = [];
         this.minOrderSize = 0.000001; // Minimum order size
-        this.maxOrders = 50; // Maximum number of orders
+        this.maxOrders = 999; // Maximum number of orders (increased for sequential signing)
     }
 
+    /**
+     * Calculates order distribution using either linear or logarithmic method
+     * @param {Object} params - Order parameters
+     * @param {number} params.bottomMarketCap - Target bottom market cap
+     * @param {number} params.topMarketCap - Target top market cap
+     * @param {number} params.orderCount - Number of orders to create
+     * @param {number} params.totalTokens - Total token amount to distribute
+     * @param {number} params.tokenSupply - Total token supply
+     * @param {boolean} params.useLogarithmic - Whether to use logarithmic distribution
+     * @returns {Array} Array of calculated orders
+     */
     calculateMarketCapDistribution(params) {
         const {
             bottomMarketCap,
             topMarketCap,
             orderCount,
             totalTokens,
-            tokenSupply
+            tokenSupply,
+            useLogarithmic = false
         } = params;
 
         // Validation
         this.validateMarketCapParams(params);
 
-        const orders = [];
+        // Calculate price range based on market caps and total supply
         const bottomPrice = bottomMarketCap / tokenSupply;
         const topPrice = topMarketCap / tokenSupply;
         
-        // Calculate price increment between orders
-        const priceIncrement = (topPrice - bottomPrice) / (orderCount - 1);
+        console.log(`📊 Price calculation:`, {
+            bottomMarketCap,
+            topMarketCap,
+            tokenSupply,
+            bottomPrice,
+            topPrice,
+            useLogarithmic
+        });
+
+        const orders = [];
         
-        // Calculate tokens per order
+        if (useLogarithmic) {
+            // Logarithmic distribution - more orders at lower prices
+            orders.push(...this.calculateLogarithmicDistribution({
+                bottomPrice,
+                topPrice,
+                orderCount,
+                totalTokens,
+                tokenSupply
+            }));
+        } else {
+            // Linear distribution - evenly spaced prices
+            orders.push(...this.calculateLinearDistribution({
+                bottomPrice,
+                topPrice,
+                orderCount,
+                totalTokens,
+                tokenSupply
+            }));
+        }
+
+        // Sort orders by price (lowest to highest)
+        orders.sort((a, b) => a.price - b.price);
+
+        this.orders = orders;
+        return orders;
+    }
+
+    /**
+     * Linear distribution - evenly spaced price intervals
+     */
+    calculateLinearDistribution({ bottomPrice, topPrice, orderCount, totalTokens, tokenSupply }) {
+        console.log('📈 Using LINEAR distribution');
+        
+        const priceIncrement = (topPrice - bottomPrice) / (orderCount - 1);
         const tokensPerOrder = totalTokens / orderCount;
 
-        // Generate orders
+        const orders = [];
         for (let i = 0; i < orderCount; i++) {
             const sellPrice = bottomPrice + (priceIncrement * i);
             const marketCap = sellPrice * tokenSupply;
@@ -37,16 +90,63 @@ export class OrderManager {
                 price: sellPrice,
                 amount: tokensPerOrder,
                 marketCap: marketCap,
-                totalXRP: tokensPerOrder * sellPrice
+                totalXRP: tokensPerOrder * sellPrice,
+                distributionType: 'linear'
             };
             
             orders.push(order);
         }
 
-        // Sort orders by price (lowest to highest)
-        orders.sort((a, b) => a.price - b.price);
+        return orders;
+    }
 
-        this.orders = orders;
+    /**
+     * Logarithmic distribution - more orders at lower prices
+     */
+    calculateLogarithmicDistribution({ bottomPrice, topPrice, orderCount, totalTokens, tokenSupply }) {
+        console.log('📈 Using LOGARITHMIC distribution');
+        
+        const priceRatio = topPrice / bottomPrice;
+        const orders = [];
+        
+        // Calculate logarithmic weights (more weight at lower prices)
+        const weights = [];
+        let totalWeight = 0;
+        
+        for (let i = 0; i < orderCount; i++) {
+            const ratio = i / (orderCount - 1); // 0 to 1
+            // Inverse logarithmic weight: higher weight for lower prices (early orders)
+            const weight = Math.pow(2, (1 - ratio) * 3); // Exponential decay from 8 to 1
+            weights.push(weight);
+            totalWeight += weight;
+        }
+        
+        // Calculate logarithmic price points and weighted token amounts
+        for (let i = 0; i < orderCount; i++) {
+            const ratio = i / (orderCount - 1); // 0 to 1
+            const sellPrice = bottomPrice * Math.pow(priceRatio, ratio);
+            const marketCap = sellPrice * tokenSupply;
+            
+            // Logarithmic token distribution: more tokens at lower prices
+            const tokensPerOrder = (weights[i] / totalWeight) * totalTokens;
+            
+            const order = {
+                index: i + 1,
+                price: sellPrice,
+                amount: tokensPerOrder,
+                marketCap: marketCap,
+                totalXRP: tokensPerOrder * sellPrice,
+                distributionType: 'logarithmic'
+            };
+            
+            orders.push(order);
+        }
+
+        console.log('📊 Logarithmic distribution summary:', {
+            priceRange: `${bottomPrice.toFixed(6)} - ${topPrice.toFixed(6)}`,
+            tokenDistribution: orders.map(o => ({ price: o.price.toFixed(6), tokens: Math.round(o.amount) }))
+        });
+
         return orders;
     }
 

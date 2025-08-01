@@ -127,6 +127,20 @@
                                     </div>
                                 </div>
 
+                                <!-- Distribution Method Selection -->
+                                <div class="distribution-method">
+                                    <div class="form-group checkbox-group">
+                                        <div class="method-description">
+                                            <span class="linear-desc">✅ Linear (Default): Evenly spaced price intervals</span>
+                                            <span class="logarithmic-desc">📈 Logarithmic: More orders at lower prices</span>
+                                        </div>
+                                        <label class="checkbox-label">
+                                            <input type="checkbox" id="useLogarithmic" class="checkbox">
+                                            <span class="checkbox-text">Check for Logarithmic Distribution</span>
+                                        </label>
+                                    </div>
+                                </div>
+
                                 <div class="form-actions">
                                     <button class="btn btn-secondary" id="calculateOrders">Calculate Orders</button>
                                     <button class="btn btn-primary" id="createOrders" disabled>Create Orders</button>
@@ -157,6 +171,10 @@
                         <div class="card-header">
                             <h4>Order Preview</h4>
                             <div class="preview-stats">
+                                <span class="stat">
+                                    <span class="stat-label">Distribution:</span>
+                                    <span class="stat-value" id="distributionType">Linear</span>
+                                </span>
                                 <span class="stat">
                                     <span class="stat-label">Total Orders:</span>
                                     <span class="stat-value" id="totalOrdersCount">0</span>

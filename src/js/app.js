@@ -11,11 +11,65 @@ class App {
         this.orders = [];
         this.walletAddress = null;
         
-        // XLS-56 Batch Transaction Limits
-        this.MAX_BATCH_ORDERS = 8;
+        // Sequential signing allows unlimited orders (no batch limit)
+        this.MAX_BATCH_ORDERS = 999; // Effectively unlimited for sequential signing
         this.MIN_ORDERS = 1;
         
         this.init();
+    }
+
+    // Helper function to decode hex-encoded currency codes
+    decodeCurrencyCode(currency) {
+        // If it's exactly 3 characters, it's a standard currency code
+        if (currency.length === 3) {
+            return currency;
+        }
+        
+        // If it's 40 characters and all hex, it's an encoded currency
+        if (currency.length === 40 && /^[0-9A-F]+$/i.test(currency)) {
+            try {
+                let decoded = '';
+                for (let i = 0; i < currency.length; i += 2) {
+                    const hex = currency.substr(i, 2);
+                    const charCode = parseInt(hex, 16);
+                    if (charCode !== 0) {
+                        decoded += String.fromCharCode(charCode);
+                    }
+                }
+                // Return decoded name if it contains readable characters
+                if (decoded.trim() && /^[\x20-\x7E]+$/.test(decoded.trim())) {
+                    return decoded.trim();
+                }
+            } catch (e) {
+                console.log('Could not decode currency:', currency);
+            }
+        }
+        
+        // Return original if can't decode
+        return currency;
+    }
+
+    // Helper function to get a friendly token name
+    getFriendlyTokenName(currency, issuer) {
+        const decoded = this.decodeCurrencyCode(currency);
+        
+        // Known token mappings for better display names
+        const knownTokens = {
+            'solo': 'SOLO',
+            'coreum': 'CORE',
+            'evernode': 'EVR',
+            'xft': 'XFT',
+            'csc': 'CSC',
+            'honey': 'HONEY',
+            'nps': 'NPS'
+        };
+        
+        const lowerDecoded = decoded.toLowerCase();
+        if (knownTokens[lowerDecoded]) {
+            return knownTokens[lowerDecoded];
+        }
+        
+        return decoded;
     }
 
     async init() {
@@ -416,7 +470,11 @@ class App {
                         minimumFractionDigits: 0
                     });
                     
-                    option.textContent = `${line.currency} (Balance: ${balanceAmount})`;
+                    // Get friendly token name
+                    const friendlyName = this.getFriendlyTokenName(line.currency, line.account);
+                    const shortIssuer = line.account.substring(0, 8) + '...';
+                    
+                    option.textContent = `${friendlyName} (Balance: ${balanceAmount}) - ${shortIssuer}`;
                     ownedSection.appendChild(option);
                     addedTokens++;
                     console.log('✅ Added token option:', option.textContent, 'Value:', option.value);
@@ -466,7 +524,7 @@ class App {
         `;
     }
 
-    handleTokenSelection(value) {
+    async handleTokenSelection(value) {
         const customInput = document.getElementById('customTokenInput');
         const tokenSupplyInput = document.getElementById('tokenSupply');
         
@@ -489,20 +547,18 @@ class App {
                 if (selectedOption && selectedOption.getAttribute('data-balance')) {
                     const balance = parseFloat(selectedOption.getAttribute('data-balance'));
                     // Don't auto-fill with personal balance - user needs to enter total supply
-                    tokenSupplyInput.value = '';
                     tokenSupplyInput.placeholder = `Enter total token supply (Your balance: ${balance.toLocaleString()})`;
                     console.log('📋 Token selected - balance available for reference:', balance);
                 } else {
-                    tokenSupplyInput.value = '';
-                    tokenSupplyInput.placeholder = 'Enter total token supply';
+                    tokenSupplyInput.placeholder = 'Loading token supply...';
                 }
                 
                 // Auto-load token details if available
-                this.loadTokenDetails(currency, issuer);
+                await this.loadTokenDetails(currency, issuer);
             } else if (value) {
                 // Load token details for popular tokens
                 tokenSupplyInput.value = '';
-                this.loadTokenDetails(value);
+                await this.loadTokenDetails(value);
             } else {
                 // Clear when no token selected
                 tokenSupplyInput.value = '';
@@ -518,30 +574,73 @@ class App {
 
     async loadTokenDetails(tokenSymbol, issuer = null) {
         try {
-            let tokenData;
+            const tokenSupplyInput = document.getElementById('tokenSupply');
+            
+            // Show loading state with animation
+            tokenSupplyInput.classList.add('loading');
+            tokenSupplyInput.placeholder = 'Loading token supply...';
             
             if (issuer) {
-                // For owned tokens, try to get metadata
-                tokenData = await this.xrplClient.getTokenMetadata(tokenSymbol, issuer);
+                // For owned tokens with issuer, get live data from XRPL
+                console.log('🔍 Fetching token info for:', tokenSymbol, 'from issuer:', issuer);
+                
+                // Get token supply information
+                const tokenInfo = await this.xrplClient.getTokenInfo(tokenSymbol, issuer);
+                if (tokenInfo && tokenInfo.totalSupply > 0) {
+                    tokenSupplyInput.value = tokenInfo.totalSupply.toString();
+                    console.log('📊 Token supply loaded:', tokenInfo.totalSupply);
+                } else {
+                    tokenSupplyInput.placeholder = 'Could not fetch supply - enter manually';
+                }
+                
             } else {
                 // For popular tokens, use predefined data
-                tokenData = this.getTokenData(tokenSymbol);
+                const tokenData = this.getTokenData(tokenSymbol);
+                if (tokenData && tokenData.supply) {
+                    tokenSupplyInput.value = tokenData.supply.toString();
+                    console.log('📊 Predefined token supply loaded:', tokenData.supply);
+                } else {
+                    tokenSupplyInput.placeholder = 'Enter total token supply';
+                }
             }
             
-            if (tokenData && tokenData.totalSupply) {
-                document.getElementById('tokenSupply').value = tokenData.totalSupply;
-            }
         } catch (error) {
             console.warn('Could not load token details:', error);
+            document.getElementById('tokenSupply').placeholder = 'Could not fetch data - enter manually';
+        } finally {
+            // Remove loading animation
+            document.getElementById('tokenSupply').classList.remove('loading');
         }
     }
 
     getTokenData(symbol) {
-        // Predefined popular XRPL tokens
+        // Predefined popular XRPL tokens with real issuer addresses
         const tokens = {
-            'SOLO': { supply: 400000000, issuer: 'rHZwvHEs56GCmHupwjA4RY7oPA3EoAJWuN' },
-            'XLS20': { supply: 1000000000, issuer: 'rXLS20ExampleIssuerAddress...' },
-            // Add more popular tokens
+            'SOLO': { 
+                supply: 400000000, 
+                issuer: 'rHZwvHEs56GCmHupwjA4RY7oPA3EoAJWuN',
+                name: 'Sologenic'
+            },
+            'CORE': { 
+                supply: 10000000000, 
+                issuer: 'rcoreNywaoz2ZCQ8Lg2EbSLnGuRBmun6D',
+                name: 'Coreum'
+            },
+            'CSC': { 
+                supply: 1000000000, 
+                issuer: 'rCSCManTZ8ME9EoLrSHHYKW8PPwWMgkwr',
+                name: 'CasinoCoin'
+            },
+            'XPR': { 
+                supply: 15000000000, 
+                issuer: 'rDNvpqNrWJFweWBqt4yFTdMqaYZn2XQ5oW',
+                name: 'Proton'
+            },
+            'VGB': { 
+                supply: 10000000000, 
+                issuer: 'rckzVpTnKpP4TJ1puQe827bV3X4oYtdTP',
+                name: 'VegasBaby'
+            }
         };
         
         return tokens[symbol];
@@ -553,6 +652,7 @@ class App {
         const orderCount = parseInt(document.getElementById('orderCount').value);
         const totalTokens = parseFloat(document.getElementById('totalTokens').value);
         const tokenSupply = parseFloat(document.getElementById('tokenSupply').value);
+        const useLogarithmic = document.getElementById('useLogarithmic').checked;
 
         // Validation
         if (!this.validateMarketCapInputs(bottomMarketCap, topMarketCap, orderCount, totalTokens, tokenSupply)) {
@@ -565,7 +665,8 @@ class App {
                 topMarketCap,
                 orderCount,
                 totalTokens,
-                tokenSupply
+                tokenSupply,
+                useLogarithmic
             });
 
             this.displayOrderPreview();
@@ -587,9 +688,9 @@ class App {
             return false;
         }
 
-        // XLS-56 Batch transaction limits
+        // Sequential signing validation
         if (orderCount < this.MIN_ORDERS || orderCount > this.MAX_BATCH_ORDERS) {
-            this.showError(`Number of orders must be between ${this.MIN_ORDERS} and ${this.MAX_BATCH_ORDERS} (XLS-56 batch limit)`);
+            this.showError(`Number of orders must be between ${this.MIN_ORDERS} and ${this.MAX_BATCH_ORDERS} (sequential signing supports many orders)`);
             return false;
         }
 
@@ -623,6 +724,7 @@ class App {
         const previewBody = document.getElementById('ordersPreviewBody');
         const totalOrdersCount = document.getElementById('totalOrdersCount');
         const totalXRPExpected = document.getElementById('totalXRPExpected');
+        const distributionTypeEl = document.getElementById('distributionType');
         const batchFeeEl = document.getElementById('batchFee');
 
         // Clear previous preview
@@ -630,6 +732,13 @@ class App {
 
         // Calculate totals
         let totalXRP = 0;
+
+        // Show distribution type
+        if (distributionTypeEl && this.orders.length > 0) {
+            const distributionType = this.orders[0].distributionType || 'linear';
+            distributionTypeEl.textContent = distributionType.charAt(0).toUpperCase() + distributionType.slice(1);
+            distributionTypeEl.style.color = distributionType === 'logarithmic' ? '#ffc107' : '#51cf66';
+        }
 
         // Populate table
         this.orders.forEach((order, index) => {
@@ -920,9 +1029,9 @@ class App {
         const container = document.getElementById('manualOrdersList');
         const currentOrders = container.querySelectorAll('.manual-order-row').length;
         
-        // Check XLS-56 batch limit
+        // Check sequential signing limit
         if (currentOrders >= this.MAX_BATCH_ORDERS) {
-            this.showError(`Cannot add more than ${this.MAX_BATCH_ORDERS} manual orders (XLS-56 batch limit)`);
+            this.showError(`Cannot add more than ${this.MAX_BATCH_ORDERS} manual orders (practical limit for sequential signing)`);
             return;
         }
         
@@ -1013,7 +1122,7 @@ class App {
                 counter.style.color = '#dc3545';
                 counter.style.borderColor = 'rgba(220, 53, 69, 0.2)';
                 addButton.disabled = true;
-                addButton.textContent = 'Batch Limit Reached';
+                addButton.textContent = 'Practical Limit Reached';
             } else {
                 counter.style.background = 'rgba(255, 193, 7, 0.1)';
                 counter.style.color = '#ffc107';
@@ -1033,9 +1142,9 @@ class App {
             return;
         }
 
-        // XLS-56 batch validation
+        // Sequential signing validation
         if (manualOrderRows.length > this.MAX_BATCH_ORDERS) {
-            this.showError(`Cannot create more than ${this.MAX_BATCH_ORDERS} manual orders in a single batch (XLS-56 limitation)`);
+            this.showError(`Cannot create more than ${this.MAX_BATCH_ORDERS} manual orders (practical limit for sequential signing)`);
             return;
         }
 

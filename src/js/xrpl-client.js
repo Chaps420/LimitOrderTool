@@ -321,4 +321,83 @@ export class XRPLClient {
             return [];
         }
     }
+
+    async getTokenInfo(currency, issuer) {
+        try {
+            // Get gateway balances to find total supply
+            const gatewayResponse = await this.client.request({
+                command: 'gateway_balances',
+                account: issuer,
+                ledger_index: 'validated'
+            });
+            
+            // Extract total supply from obligations
+            let totalSupply = 0;
+            if (gatewayResponse.result.obligations && gatewayResponse.result.obligations[currency]) {
+                totalSupply = parseFloat(gatewayResponse.result.obligations[currency]);
+            }
+            
+            return {
+                currency,
+                issuer,
+                totalSupply
+            };
+        } catch (error) {
+            console.error('Error getting token info:', error);
+            return {
+                currency,
+                issuer,
+                totalSupply: 0
+            };
+        }
+    }
+
+    async getCurrentTokenPrice(currency, issuer) {
+        try {
+            // Get order book to find current price (XRP/Token)
+            const bookResponse = await this.client.request({
+                command: 'book_offers',
+                taker_gets: {
+                    currency: 'XRP'
+                },
+                taker_pays: {
+                    currency,
+                    issuer
+                },
+                limit: 1,
+                ledger_index: 'validated'
+            });
+            
+            if (bookResponse.result.offers && bookResponse.result.offers.length > 0) {
+                const offer = bookResponse.result.offers[0];
+                const xrpAmount = parseFloat(offer.TakerGets) / 1000000; // Convert drops to XRP
+                const tokenAmount = parseFloat(offer.TakerPays.value);
+                const priceInXRP = xrpAmount / tokenAmount;
+                
+                // Convert to USD using approximate XRP price
+                // You might want to fetch current XRP price from an API
+                const xrpPriceUSD = 0.60; // Approximate XRP price - consider making this dynamic
+                const priceInUSD = priceInXRP * xrpPriceUSD;
+                
+                return {
+                    priceInXRP,
+                    priceInUSD,
+                    marketCapUSD: 0 // Will be calculated when combined with total supply
+                };
+            }
+            
+            return {
+                priceInXRP: 0,
+                priceInUSD: 0,
+                marketCapUSD: 0
+            };
+        } catch (error) {
+            console.error('Error getting token price:', error);
+            return {
+                priceInXRP: 0,
+                priceInUSD: 0,
+                marketCapUSD: 0
+            };
+        }
+    }
 }
