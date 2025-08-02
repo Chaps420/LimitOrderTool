@@ -7,18 +7,25 @@ export class XRPLClient {
 
     async connect() {
         try {
-            // Use global XRPL library loaded from CDN
-            if (typeof window.xrpl === 'undefined') {
-                throw new Error('XRPL library not loaded. Please ensure the XRPL CDN script is included.');
-            }
+            console.log('🔗 Connecting to XRPL...');
             
-            this.client = new window.xrpl.Client(this.serverUrl);
+            // Check if XRPL library is available
+            if (!window.xrpl) {
+                throw new Error('XRPL library not loaded');
+            }
+
+            // Use the correct XRPL client constructor
+            this.client = new window.xrpl.Client('wss://xrplcluster.com');
+            
             await this.client.connect();
             this.isConnected = true;
+            
             console.log('✅ Connected to XRPL network');
             return true;
+            
         } catch (error) {
             console.error('❌ Failed to connect to XRPL:', error);
+            this.isConnected = false;
             throw error;
         }
     }

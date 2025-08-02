@@ -38,8 +38,12 @@ class App {
             
             if (response.ok) {
                 console.log('🔐 Backend detected, using full Xaman integration');
+                const { WalletConnector } = await import('./wallet-connector.js');
                 this.standaloneMode = false;
                 this.walletConnector = new WalletConnector();
+                this.walletConnector.onConnect = (address) => {
+                    this.onWalletConnected(address);
+                };
                 this.updateUIForMode('backend');
                 console.log('✅ Backend mode initialized');
             } else {
@@ -47,10 +51,20 @@ class App {
             }
         } catch (error) {
             console.log('⚡ No backend detected, switching to standalone mode:', error.message);
-            this.standaloneMode = true;
-            this.walletConnector = new WalletConnectorStandalone();
-            this.updateUIForMode('standalone');
-            console.log('✅ Standalone mode initialized');
+            
+            try {
+                const { WalletConnectorStandalone } = await import('./wallet-connector-standalone.js');
+                this.standaloneMode = true;
+                this.walletConnector = new WalletConnectorStandalone();
+                this.walletConnector.onConnect = (address) => {
+                    this.onWalletConnected(address);
+                };
+                this.updateUIForMode('standalone');
+                console.log('✅ Standalone mode initialized');
+            } catch (standaloneError) {
+                console.error('❌ Failed to initialize standalone mode:', standaloneError);
+                this.showError('❌ Failed to initialize wallet system: ' + standaloneError.message);
+            }
         }
     }
 
