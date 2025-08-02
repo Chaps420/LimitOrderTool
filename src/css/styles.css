@@ -207,7 +207,7 @@ body {
 }
 
 /* Section Styles */
-.strategy-section, .preview-section, .status-section {
+.preview-section, .status-section {
     margin-bottom: 3rem;
 }
 
@@ -221,44 +221,7 @@ body {
     color: #ffffff;
 }
 
-/* Strategy Tabs */
-.strategy-tabs {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 2rem;
-}
 
-.tab-btn {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 193, 7, 0.3);
-    color: #cccccc;
-    padding: 0.75rem 1.5rem;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-weight: 500;
-}
-
-.tab-btn:hover {
-    background: rgba(255, 193, 7, 0.1);
-    color: #ffc107;
-    border-color: rgba(255, 193, 7, 0.5);
-}
-
-.tab-btn.active {
-    background: rgba(255, 193, 7, 0.2);
-    color: #ffc107;
-    border-color: #ffc107;
-}
-
-/* Strategy Content */
-.strategy-content {
-    display: none;
-}
-
-.strategy-content.active {
-    display: block;
-}
 
 /* Card Styles */
 .card {
@@ -296,13 +259,7 @@ body {
     line-height: 1.4;
 }
 
-.manual-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    width: 100%;
-    justify-content: space-between;
-}
+
 
 .batch-counter {
     background: rgba(255, 193, 7, 0.1);
@@ -632,36 +589,7 @@ select.form-control optgroup option {
     justify-content: center;
 }
 
-/* Manual Orders */
-.manual-orders-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
 
-.manual-order-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr 1fr auto;
-    gap: 1rem;
-    align-items: end;
-    padding: 1rem;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.remove-order {
-    background: rgba(220, 53, 69, 0.2);
-    border-color: #dc3545;
-    color: #dc3545;
-    padding: 0.5rem;
-    width: auto;
-    height: fit-content;
-}
-
-.remove-order:hover {
-    background: rgba(220, 53, 69, 0.3);
-}
 
 /* Status Display */
 .status-display {
@@ -708,14 +636,7 @@ select.form-control optgroup option {
         font-size: 2rem;
     }
 
-    .strategy-tabs {
-        flex-direction: column;
-    }
 
-    .manual-order-row {
-        grid-template-columns: 1fr;
-        gap: 0.5rem;
-    }
 
     .form-actions {
         flex-direction: column;

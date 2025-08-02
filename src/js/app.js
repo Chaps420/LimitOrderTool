@@ -12,7 +12,6 @@ class App {
         this.walletConnector = null;
         
         this.orderManager = new OrderManager();
-        this.currentStrategy = 'market-cap';
         this.orders = [];
         this.walletAddress = null;
         
@@ -179,13 +178,6 @@ class App {
     }
 
     setupEventListeners() {
-        // Strategy tab switching
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                this.switchStrategy(e.target.dataset.strategy);
-            });
-        });
-
         // Wallet connection
         const connectWalletBtn = document.getElementById('connectWallet');
         if (connectWalletBtn) {
@@ -231,30 +223,6 @@ class App {
         if (signTransactionBtn) {
             signTransactionBtn.addEventListener('click', () => {
                 this.signTransaction();
-            });
-        }
-
-        // Add manual order
-        const addOrderBtn = document.getElementById('addOrder');
-        if (addOrderBtn) {
-            addOrderBtn.addEventListener('click', () => {
-                this.addManualOrder();
-            });
-        }
-
-        // Calculate manual orders
-        const calculateManualOrdersBtn = document.getElementById('calculateManualOrders');
-        if (calculateManualOrdersBtn) {
-            calculateManualOrdersBtn.addEventListener('click', () => {
-                this.calculateManualOrders();
-            });
-        }
-
-        // Create manual orders
-        const createManualOrdersBtn = document.getElementById('createManualOrders');
-        if (createManualOrdersBtn) {
-            createManualOrdersBtn.addEventListener('click', () => {
-                this.createManualOrders();
             });
         }
 
@@ -356,23 +324,6 @@ class App {
         setTimeout(() => {
             notification.remove();
         }, 5000);
-    }
-
-    switchStrategy(strategy) {
-        this.currentStrategy = strategy;
-        
-        // Update tabs
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.strategy === strategy);
-        });
-
-        // Update content
-        document.querySelectorAll('.strategy-content').forEach(content => {
-            content.classList.toggle('active', content.id === `${strategy.replace('-', '')}Strategy`);
-        });
-
-        // Reset preview
-        this.hidePreview();
     }
 
     async connectWallet() {
@@ -1110,224 +1061,7 @@ class App {
         }
     }
 
-    addManualOrder() {
-        const container = document.getElementById('manualOrdersList');
-        const currentOrders = container.querySelectorAll('.manual-order-row').length;
-        
-        // Check sequential signing limit
-        if (currentOrders >= this.MAX_BATCH_ORDERS) {
-            this.showError(`Cannot add more than ${this.MAX_BATCH_ORDERS} manual orders (practical limit for sequential signing)`);
-            return;
-        }
-        
-        const orderRow = document.createElement('div');
-        orderRow.className = 'manual-order-row';
-        
-        // Get available tokens for the dropdown
-        const tokenSelect = document.getElementById('tokenSelect');
-        let tokenOptions = '<option value="">Choose token...</option>';
-        
-        for (let option of tokenSelect.options) {
-            if (option.value && option.value !== 'custom') {
-                const currency = option.getAttribute('data-currency') || option.value.split(':')[0];
-                const balance = option.getAttribute('data-balance') || 'Unknown';
-                tokenOptions += `<option value="${option.value}" data-balance="${balance}" data-currency="${currency}">${option.textContent}</option>`;
-            }
-        }
-        
-        orderRow.innerHTML = `
-            <div class="form-group">
-                <label>Token to Sell</label>
-                <select class="form-control order-token">
-                    ${tokenOptions}
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Price (XRP per Token)</label>
-                <input type="number" class="form-control order-price" placeholder="0.001" step="0.000001">
-            </div>
-            <div class="form-group">
-                <label>Amount (Tokens)</label>
-                <input type="number" class="form-control order-amount" placeholder="1000">
-            </div>
-            <div class="form-group">
-                <label>Total XRP</label>
-                <input type="text" class="form-control order-total" readonly placeholder="Calculated">
-            </div>
-            <button class="btn remove-order" onclick="this.parentElement.remove(); app.updateManualOrderCounter();">×</button>
-        `;
-        
-        container.appendChild(orderRow);
-        
-        // Update counter
-        this.updateManualOrderCounter();
-        
-        // Add event listeners for automatic calculations
-        const tokenSelectInput = orderRow.querySelector('.order-token');
-        const priceInput = orderRow.querySelector('.order-price');
-        const amountInput = orderRow.querySelector('.order-amount');
-        const totalInput = orderRow.querySelector('.order-total');
-        
-        // Update total XRP when price or amount changes
-        const updateTotal = () => {
-            const price = parseFloat(priceInput.value) || 0;
-            const amount = parseFloat(amountInput.value) || 0;
-            const total = price * amount;
-            totalInput.value = total > 0 ? `${total.toLocaleString()} XRP` : '';
-        };
-        
-        // Set max amount when token is selected
-        tokenSelectInput.addEventListener('change', () => {
-            const selectedOption = tokenSelectInput.selectedOptions[0];
-            if (selectedOption && selectedOption.getAttribute('data-balance')) {
-                const balance = parseFloat(selectedOption.getAttribute('data-balance'));
-                amountInput.max = balance;
-                amountInput.placeholder = `Max: ${balance.toLocaleString()}`;
-                console.log('✅ Set max amount for manual order:', balance);
-            }
-        });
-        
-        priceInput.addEventListener('input', updateTotal);
-        amountInput.addEventListener('input', updateTotal);
-    }
 
-    updateManualOrderCounter() {
-        const container = document.getElementById('manualOrdersList');
-        const currentCount = container.querySelectorAll('.manual-order-row').length;
-        const counterEl = document.getElementById('manualOrderCount');
-        const addButton = document.getElementById('addOrder');
-        
-        if (counterEl) {
-            counterEl.textContent = currentCount;
-            
-            // Update counter color based on limit
-            const counter = counterEl.parentElement;
-            if (currentCount >= this.MAX_BATCH_ORDERS) {
-                counter.style.background = 'rgba(220, 53, 69, 0.1)';
-                counter.style.color = '#dc3545';
-                counter.style.borderColor = 'rgba(220, 53, 69, 0.2)';
-                addButton.disabled = true;
-                addButton.textContent = 'Practical Limit Reached';
-            } else {
-                counter.style.background = 'rgba(255, 193, 7, 0.1)';
-                counter.style.color = '#ffc107';
-                counter.style.borderColor = 'rgba(255, 193, 7, 0.2)';
-                addButton.disabled = false;
-                addButton.textContent = '+ Add Order';
-            }
-        }
-    }
-
-    calculateManualOrders() {
-        console.log('Calculating manual orders...');
-        
-        const manualOrderRows = document.querySelectorAll('.manual-order-row');
-        if (manualOrderRows.length === 0) {
-            this.showError('Please add at least one manual order first');
-            return;
-        }
-
-        // Sequential signing validation
-        if (manualOrderRows.length > this.MAX_BATCH_ORDERS) {
-            this.showError(`Cannot create more than ${this.MAX_BATCH_ORDERS} manual orders (practical limit for sequential signing)`);
-            return;
-        }
-
-        const orders = [];
-        let hasErrors = false;
-
-        manualOrderRows.forEach((row, index) => {
-            const tokenSelect = row.querySelector('.order-token');
-            const priceInput = row.querySelector('.order-price');
-            const amountInput = row.querySelector('.order-amount');
-
-            const token = tokenSelect.value;
-            const price = parseFloat(priceInput.value);
-            const amount = parseFloat(amountInput.value);
-
-            if (!token || !price || !amount) {
-                this.showError(`Order ${index + 1}: Please fill in all fields`);
-                hasErrors = true;
-                return;
-            }
-
-            if (price <= 0 || amount <= 0) {
-                this.showError(`Order ${index + 1}: Price and amount must be greater than 0`);
-                hasErrors = true;
-                return;
-            }
-
-            const total = price * amount;
-            orders.push({
-                token,
-                price,
-                amount,
-                total,
-                index: index + 1
-            });
-        });
-
-        if (hasErrors) {
-            return;
-        }
-
-        console.log('✅ Manual orders calculated:', orders);
-
-        // Show preview
-        this.displayManualOrderPreview(orders);
-        
-        // Enable create orders button
-        document.getElementById('createManualOrders').disabled = false;
-        this.showStatus(`${orders.length} manual orders calculated successfully!`, 'success');
-    }
-
-    displayManualOrderPreview(orders) {
-        const previewBody = document.getElementById('ordersPreviewBody');
-        const previewSection = document.getElementById('previewSection');
-        const totalOrdersCount = document.getElementById('totalOrdersCount');
-        const totalXRPExpected = document.getElementById('totalXRPExpected');
-
-        previewBody.innerHTML = '';
-        
-        let totalXRP = 0;
-        
-        orders.forEach(order => {
-            const row = document.createElement('tr');
-            
-            row.innerHTML = `
-                <td>${order.index}</td>
-                <td>${order.price.toFixed(6)} XRP</td>
-                <td>${order.amount.toLocaleString()}</td>
-                <td>Manual Order</td>
-                <td>${order.total.toLocaleString()} XRP</td>
-            `;
-            
-            previewBody.appendChild(row);
-            totalXRP += order.total;
-        });
-
-        totalOrdersCount.textContent = orders.length;
-        totalXRPExpected.textContent = `${totalXRP.toLocaleString()} XRP`;
-
-        previewSection.style.display = 'block';
-        previewSection.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    createManualOrders() {
-        console.log('📝 Creating manual orders...');
-        
-        // Get orders from preview table
-        const previewBody = document.getElementById('ordersPreviewBody');
-        const orderRows = previewBody.querySelectorAll('tr');
-        
-        if (orderRows.length === 0) {
-            this.showError('Please calculate orders first');
-            return;
-        }
-
-        // Trigger the same signing flow as market cap orders
-        this.signTransaction();
-    }
 
     enableOrderCreation() {
         document.getElementById('calculateOrders').disabled = false;
@@ -1343,12 +1077,6 @@ class App {
     }
 
     updateOrdersDisplay() {
-        // Clear manual orders list
-        const manualOrdersList = document.getElementById('manualOrdersList');
-        if (manualOrdersList) {
-            manualOrdersList.innerHTML = '<!-- Manual orders will be added here -->';
-        }
-
         // Clear orders preview
         const ordersPreviewBody = document.getElementById('ordersPreviewBody');
         if (ordersPreviewBody) {
@@ -1525,7 +1253,7 @@ class App {
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     const app = new App();
-    // Make app globally available for manual order management
+    // Make app globally available for debugging
     window.app = app;
     
     // Debug function to test QR modal
