@@ -38,6 +38,36 @@ export class WalletConnectorStandalone {
     }
 
     /**
+     * Simple connect method to match the interface expected by app.js
+     */
+    async connect() {
+        console.log('🔗 Standalone wallet connect called');
+        
+        // For demo purposes, show a simple prompt
+        // In production, this would use proper Xaman integration
+        const address = prompt('Enter your XRPL wallet address for demo purposes:\n(In production, this would connect via Xaman)');
+        
+        if (address && this.isValidXRPLAddress(address)) {
+            this.walletAddress = address;
+            this.isConnected = true;
+            this.walletType = 'demo';
+            
+            console.log('✅ Demo wallet connected:', address);
+            return address;
+        } else {
+            throw new Error('Invalid XRPL address or connection cancelled');
+        }
+    }
+
+    /**
+     * Validate XRPL address format
+     */
+    isValidXRPLAddress(address) {
+        // Basic XRPL address validation
+        return address && address.length >= 25 && address.length <= 34 && address.startsWith('r');
+    }
+
+    /**
      * Connect wallet using Xaman OAuth (no backend required)
      */
     async connectWallet() {

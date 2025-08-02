@@ -27,8 +27,11 @@ class App {
      * Auto-detect if backend is available, switch to standalone if not
      */
     async detectAndInitializeWalletConnector() {
+        console.log('🔍 Detecting wallet connector mode...');
+        
         try {
             // Try to ping backend
+            console.log('📡 Trying to reach backend at localhost:3002...');
             const response = await fetch('http://localhost:3002/health', { 
                 method: 'GET',
                 signal: AbortSignal.timeout(3000) // 3 second timeout
@@ -39,14 +42,16 @@ class App {
                 this.standaloneMode = false;
                 this.walletConnector = new WalletConnector();
                 this.updateUIForMode('backend');
+                console.log('✅ Backend mode initialized');
             } else {
                 throw new Error('Backend not responding');
             }
         } catch (error) {
-            console.log('⚡ No backend detected, switching to standalone mode');
+            console.log('⚡ No backend detected, switching to standalone mode:', error.message);
             this.standaloneMode = true;
             this.walletConnector = new WalletConnectorStandalone();
             this.updateUIForMode('standalone');
+            console.log('✅ Standalone mode initialized');
         }
     }
 
@@ -371,14 +376,26 @@ class App {
     }
 
     async connectWallet() {
+        console.log('🔗 Connect wallet button clicked');
+        
+        if (!this.walletConnector) {
+            console.error('❌ Wallet connector not initialized');
+            this.showError('Wallet connector not ready. Please refresh the page.');
+            return;
+        }
+        
         const button = document.getElementById('connectWallet');
         const originalText = button.textContent;
         
+        console.log('🔄 Starting wallet connection...');
         button.innerHTML = '<span class="spinner"></span> Connecting...';
         button.disabled = true;
 
         try {
+            console.log('🎯 Calling wallet connector...');
             const address = await this.walletConnector.connect();
+            console.log('✅ Wallet connected with address:', address);
+            
             this.walletAddress = address;
             
             // Save wallet info to localStorage for persistence
@@ -390,7 +407,7 @@ class App {
             this.onWalletConnected(address);
             
         } catch (error) {
-            console.error('Wallet connection failed:', error);
+            console.error('❌ Wallet connection failed:', error);
             button.textContent = originalText;
             button.disabled = false;
             

@@ -4,7 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XRPL Limit Order Tool</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg">
     <link rel="stylesheet" href="./src/css/styles.css">
+    
+    <!-- Load XRPL library from CDN -->
+    <script src="https://unpkg.com/xrpl@3.0.0/dist/xrpl-latest-min.js"></script>
     
     <!-- Suppress browser extension console warnings -->
     <script>
@@ -17,7 +21,9 @@
             if (message.includes('chrome.runtime') || 
                 message.includes('isDevEnv()') || 
                 message.includes('ethereum.js') ||
-                message.includes('trusted site')) {
+                message.includes('trusted site') ||
+                message.includes('Pippit') ||
+                message.includes('contentScript')) {
                 return; // Suppress these specific warnings
             }
             originalConsoleError.apply(console, args);
@@ -28,7 +34,9 @@
             if (message.includes('chrome.runtime') || 
                 message.includes('isDevEnv()') || 
                 message.includes('ethereum.js') ||
-                message.includes('trusted site')) {
+                message.includes('trusted site') ||
+                message.includes('Pippit') ||
+                message.includes('contentScript')) {
                 return; // Suppress these specific warnings
             }
             originalConsoleWarn.apply(console, args);
@@ -233,10 +241,29 @@
 
     <!-- Scripts -->
     <script>
-        // Test alternative QR code sources
-        window.addEventListener('load', () => {
-            console.log('✅ Page loaded, QR code will use fallback API method');
-        });
+        // Wait for XRPL library to load before initializing the app
+        async function waitForXRPL() {
+            let attempts = 0;
+            const maxAttempts = 50; // 5 seconds max wait
+            
+            while (typeof window.xrpl === 'undefined' && attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+            
+            if (typeof window.xrpl === 'undefined') {
+                console.error('❌ XRPL library failed to load');
+                document.body.insertAdjacentHTML('beforeend', 
+                    '<div style="position: fixed; top: 20px; right: 20px; background: #dc3545; color: white; padding: 1rem; border-radius: 8px; z-index: 9999;">❌ XRPL library failed to load. Please refresh the page.</div>'
+                );
+            } else {
+                console.log('✅ XRPL library loaded successfully');
+                console.log('✅ Page loaded, QR code will use fallback API method');
+            }
+        }
+        
+        // Start waiting for XRPL library
+        waitForXRPL();
     </script>
     <script type="module" src="./src/js/app.js"></script>
 </body>
