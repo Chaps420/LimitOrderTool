@@ -2,7 +2,7 @@
 
 A modern web application for creating multiple XRPL limit sell orders with market cap distribution and sequential batch execution. **Runs with or without a backend server!**
 
-## ✨ New Features
+## ✨ Features
 
 - **🎯 Dual Distribution System**: Linear (default) and Logarithmic order placement algorithms
 - **⚡ Standalone Mode**: Runs completely client-side without requiring a backend server
@@ -74,10 +74,6 @@ A modern web application for creating multiple XRPL limit sell orders with marke
    - Total Token Amount: Total tokens to sell across all orders
 5. **Calculate Orders**: Preview your order distribution
 6. **Sign Transactions**: Execute orders with individual QR codes (sequential signing)
-
-### Manual Order Entry
-
-Create individual limit orders with custom prices and amounts.
 
 ## Technical Details
 
