@@ -1,11 +1,16 @@
 import { XRPLClient } from './xrpl-client.js';
 import { WalletConnector } from './wallet-connector-real.js';
+import { WalletConnectorStandalone } from './wallet-connector-standalone.js';
 import { OrderManager } from './order-manager.js';
 
 class App {
     constructor() {
         this.xrplClient = new XRPLClient();
-        this.walletConnector = new WalletConnector();
+        
+        // Auto-detect standalone mode (no backend available)
+        this.standaloneMode = false;
+        this.walletConnector = null;
+        
         this.orderManager = new OrderManager();
         this.currentStrategy = 'market-cap';
         this.orders = [];
@@ -16,6 +21,64 @@ class App {
         this.MIN_ORDERS = 1;
         
         this.init();
+    }
+
+    /**
+     * Auto-detect if backend is available, switch to standalone if not
+     */
+    async detectAndInitializeWalletConnector() {
+        try {
+            // Try to ping backend
+            const response = await fetch('http://localhost:3002/health', { 
+                method: 'GET',
+                signal: AbortSignal.timeout(3000) // 3 second timeout
+            });
+            
+            if (response.ok) {
+                console.log('🔐 Backend detected, using full Xaman integration');
+                this.standaloneMode = false;
+                this.walletConnector = new WalletConnector();
+                this.updateUIForMode('backend');
+            } else {
+                throw new Error('Backend not responding');
+            }
+        } catch (error) {
+            console.log('⚡ No backend detected, switching to standalone mode');
+            this.standaloneMode = true;
+            this.walletConnector = new WalletConnectorStandalone();
+            this.updateUIForMode('standalone');
+        }
+    }
+
+    /**
+     * Update UI based on current mode
+     */
+    updateUIForMode(mode) {
+        const statusElement = document.getElementById('backend-status');
+        if (statusElement) {
+            if (mode === 'standalone') {
+                statusElement.innerHTML = '<span style="color: #ffc107;">⚡ Standalone Mode (No Backend)</span>';
+                statusElement.title = 'Running without backend server - using client-side integration';
+            } else {
+                statusElement.innerHTML = '<span style="color: #28a745;">✅ Full Backend Mode</span>';
+                statusElement.title = 'Connected to backend server with full Xaman API';
+            }
+        }
+
+        // Show mode indicator in UI
+        this.showModeNotification(mode);
+    }
+
+    /**
+     * Show notification about current mode
+     */
+    showModeNotification(mode) {
+        const message = mode === 'standalone' 
+            ? '⚡ Running in Standalone Mode - No backend required!'
+            : '🔐 Running with Backend - Full Xaman API integration';
+        
+        const type = mode === 'standalone' ? 'info' : 'success';
+        this.showNotification(message, type);
     }
 
     // Helper function to decode hex-encoded currency codes
@@ -73,6 +136,9 @@ class App {
     }
 
     async init() {
+        // First, detect and initialize the appropriate wallet connector
+        await this.detectAndInitializeWalletConnector();
+        
         this.setupEventListeners();
         await this.xrplClient.connect();
         this.updateNetworkStatus('connected', 'Connected to XRPL');
@@ -101,8 +167,10 @@ class App {
             localStorage.removeItem('xrpl-wallet-type');
         }
         
-        // Check backend status for admin
-        await this.checkBackendStatus();
+        // Check backend status (this will be skipped in standalone mode)
+        if (!this.standaloneMode) {
+            await this.checkBackendStatus();
+        }
     }
 
     setupEventListeners() {

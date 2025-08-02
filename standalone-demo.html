@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XRPL Limit Order Tool - Standalone Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: #1a1a1a;
+            color: #ffffff;
+        }
+        .demo-section {
+            background: #2a2a2a;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-radius: 8px;
+            border: 1px solid #ffc107;
+        }
+        .demo-title {
+            color: #ffc107;
+            margin-bottom: 1rem;
+        }
+        .demo-description {
+            margin-bottom: 1rem;
+            line-height: 1.6;
+        }
+        .demo-link {
+            color: #ffc107;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .demo-link:hover {
+            text-decoration: underline;
+        }
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        .feature-list li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255, 193, 7, 0.2);
+        }
+        .feature-list li:before {
+            content: "✅ ";
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 XRPL Limit Order Tool - Standalone Mode</h1>
+    
+    <div class="demo-section">
+        <h2 class="demo-title">✅ Yes, This App Can Run Without a Backend!</h2>
+        <div class="demo-description">
+            The XRPL Limit Order Tool automatically detects whether a backend server is available and switches modes accordingly:
+        </div>
+        
+        <h3>🔐 With Backend (Current Setup):</h3>
+        <ul class="feature-list">
+            <li>Full Xaman API integration via backend proxy</li>
+            <li>Real-time payload status monitoring</li>
+            <li>Advanced QR code generation</li>
+            <li>CORS handling for API requests</li>
+        </ul>
+        
+        <h3>⚡ Standalone Mode (No Backend Required):</h3>
+        <ul class="feature-list">
+            <li>Client-side Xaman SDK integration</li>
+            <li>Direct XRPL network connections</li>
+            <li>QR code generation via external API</li>
+            <li>Local transaction signing workflow</li>
+        </ul>
+    </div>
+
+    <div class="demo-section">
+        <h2 class="demo-title">🧪 How to Test Standalone Mode</h2>
+        <div class="demo-description">
+            <strong>Option 1: Stop the Backend Server</strong><br>
+            Simply stop the backend server (Ctrl+C) and refresh the page. The app will automatically detect the missing backend and switch to standalone mode.
+        </div>
+        
+        <div class="demo-description">
+            <strong>Option 2: Use Static File Hosting</strong><br>
+            Deploy just the frontend files to any static hosting service (GitHub Pages, Netlify, Vercel, etc.) without the backend. The app will run in standalone mode by default.
+        </div>
+        
+        <div class="demo-description">
+            <strong>Option 3: Open Locally</strong><br>
+            Open <code>index.html</code> directly in your browser (file:// protocol) - no server needed!
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2 class="demo-title">🎯 Key Features That Work in Both Modes</h2>
+        <ul class="feature-list">
+            <li>Token selection and supply auto-fill</li>
+            <li>Linear and Logarithmic distribution calculations</li>
+            <li>Order preview and validation</li>
+            <li>XRPL network connectivity</li>
+            <li>Wallet connection (with different methods)</li>
+            <li>Sequential order creation</li>
+            <li>Professional UI and responsive design</li>
+        </ul>
+    </div>
+
+    <div class="demo-section">
+        <h2 class="demo-title">🌐 Deployment Options</h2>
+        <div class="demo-description">
+            <strong>Static Hosting (No Backend):</strong><br>
+            • GitHub Pages: Push to gh-pages branch<br>
+            • Netlify: Drop folder or connect Git repo<br>
+            • Vercel: Deploy frontend only<br>
+            • Any CDN or static hosting service
+        </div>
+        
+        <div class="demo-description">
+            <strong>Full Stack (With Backend):</strong><br>
+            • Railway, Heroku, DigitalOcean<br>
+            • AWS, Google Cloud, Azure<br>
+            • Any Node.js hosting platform
+        </div>
+    </div>
+
+    <div class="demo-section">
+        <h2 class="demo-title">🔗 Try It Now</h2>
+        <div class="demo-description">
+            <a href="./index.html" class="demo-link">🚀 Launch XRPL Limit Order Tool</a><br>
+            The app will automatically detect the current environment and choose the best mode.
+        </div>
+    </div>
+
+    <script>
+        // Show current backend status
+        fetch('http://localhost:3002/health')
+            .then(response => response.ok ? 'Backend Available' : 'Backend Unavailable')
+            .catch(() => 'Backend Unavailable')
+            .then(status => {
+                const statusColor = status.includes('Available') ? '#28a745' : '#ffc107';
+                document.body.insertAdjacentHTML('afterbegin', 
+                    `<div style="background: rgba(255, 193, 7, 0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid #ffc107;">
+                        <strong style="color: ${statusColor};">Current Status: ${status}</strong>
+                    </div>`
+                );
+            });
+    </script>
+</body>
+</html>
