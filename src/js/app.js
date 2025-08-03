@@ -49,30 +49,22 @@ class App {
         console.log('🔍 Detecting wallet connector mode...');
         
         try {
-            // First try Firebase Functions
-            console.log('🔥 Trying Firebase Functions...');
-            const firebaseUrl = this.getFirebaseUrl();
+            // First try GitHub Pages mode (direct Xaman API)
+            console.log('� Using GitHub Pages mode with direct Xaman API...');
             
             try {
-                const response = await fetch(`${firebaseUrl}/health`, { 
-                    method: 'GET',
-                    signal: AbortSignal.timeout(3000)
-                });
-                
-                if (response.ok) {
-                    console.log('🔥 Firebase Functions detected, using production backend');
-                    const { WalletConnectorFirebase } = await import('./wallet-connector-firebase.js');
-                    this.standaloneMode = false;
-                    this.walletConnector = new WalletConnectorFirebase();
-                    this.walletConnector.onConnect = (address) => {
-                        this.onWalletConnected(address);
-                    };
-                    this.updateUIForMode('firebase');
-                    console.log('✅ Firebase mode initialized');
-                    return;
-                }
-            } catch (firebaseError) {
-                console.log('🔥 Firebase Functions not available:', firebaseError.message);
+                // Always use GitHub connector for production
+                const { WalletConnectorGitHub } = await import('./wallet-connector-github.js');
+                this.standaloneMode = false;
+                this.walletConnector = new WalletConnectorGitHub();
+                this.walletConnector.onConnect = (address) => {
+                    this.onWalletConnected(address);
+                };
+                this.updateUIForMode('github');
+                console.log('✅ GitHub Pages mode initialized');
+                return;
+            } catch (githubError) {
+                console.log('� GitHub mode failed:', githubError.message);
             }
             
             // Fallback: Try local backend
@@ -145,7 +137,10 @@ class App {
     updateUIForMode(mode) {
         const statusElement = document.getElementById('backend-status');
         if (statusElement) {
-            if (mode === 'firebase') {
+            if (mode === 'github') {
+                statusElement.innerHTML = '<span style="color: #28a745;">🐙 GitHub Pages Mode</span>';
+                statusElement.title = 'Using GitHub Pages with direct Xaman API integration';
+            } else if (mode === 'firebase') {
                 statusElement.innerHTML = '<span style="color: #28a745;">🔥 Firebase Production Mode</span>';
                 statusElement.title = 'Connected to Firebase Functions with full Xaman API';
             } else if (mode === 'backend') {
@@ -165,7 +160,9 @@ class App {
      * Show notification about current mode
      */
     showModeNotification(mode) {
-        const message = mode === 'standalone' 
+        const message = mode === 'github' 
+            ? '🐙 GitHub Pages Mode - Direct Xaman API integration!'
+            : mode === 'standalone' 
             ? '⚡ Running in Standalone Mode - No backend required!'
             : '🔐 Running with Backend - Full Xaman API integration';
         
