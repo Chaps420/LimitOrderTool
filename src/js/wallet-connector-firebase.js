@@ -28,26 +28,18 @@ export class WalletConnectorFirebase {
     async connect() {
         console.log('🔗 Firebase wallet connect called');
         
-        // Try different wallet types in order of preference
-        const walletMethods = [
-            () => this.connectXaman(),
-            () => this.connectGemWallet(), 
-            () => this.connectCrossmark()
-        ];
-
-        for (const connectMethod of walletMethods) {
-            try {
-                const result = await connectMethod();
-                if (result.success) {
-                    return result;
-                }
-            } catch (error) {
-                console.log(`Wallet connection attempt failed:`, error.message);
-                continue;
+        // Only try Xaman - this is a Xaman-focused tool
+        try {
+            const result = await this.connectXaman();
+            if (result.success) {
+                return result;
             }
+        } catch (error) {
+            console.error('Xaman connection failed:', error.message);
+            throw new Error(`Xaman wallet connection failed: ${error.message}. Please ensure you have the Xaman app installed and try again.`);
         }
 
-        throw new Error('No compatible wallets detected. Please install Xaman, GemWallet, or Crossmark.');
+        throw new Error('Unable to connect to Xaman wallet. Please install the Xaman app and try again.');
     }
 
     async connectXaman() {
@@ -195,7 +187,7 @@ export class WalletConnectorFirebase {
         try {
             console.log('📝 Creating Xaman payload via Firebase...');
             
-            const response = await fetch(`${this.baseUrl}/xaman/payload`, {
+            const response = await fetch(`${this.baseUrl}/api/xaman/payload`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -226,7 +218,7 @@ export class WalletConnectorFirebase {
             
             try {
                 // Check payload status via Firebase
-                const response = await fetch(`${this.baseUrl}/xaman/payload/${uuid}`);
+                const response = await fetch(`${this.baseUrl}/api/xaman/payload/${uuid}`);
                 
                 if (!response.ok) {
                     throw new Error(`Status check failed: ${response.status}`);

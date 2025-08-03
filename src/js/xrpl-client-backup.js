@@ -22,8 +22,8 @@ export class XRPLClient {
             let client = null;
             let clientType = null;
             
-            // Method 1: Standard XRPL.js v2 pattern
-            if (window.xrpl && typeof window.xrpl.Client === 'function') {
+            // Method 1: Check for xrpl.Client (standard XRPL.js pattern)
+            if (window.xrpl && window.xrpl.Client && typeof window.xrpl.Client === 'function') {
                 try {
                     client = new window.xrpl.Client(this.serverUrl);
                     clientType = 'xrpl.Client';
@@ -33,7 +33,36 @@ export class XRPLClient {
                 }
             }
             
-            // Method 2: ES6 module default export
+            // Method 2: Check for the library inside js property (common in CDN builds)
+            if (!client && window.xrpl && window.xrpl.js && window.xrpl.js.Client && typeof window.xrpl.js.Client === 'function') {
+                try {
+                    client = new window.xrpl.js.Client(this.serverUrl);
+                    clientType = 'xrpl.js.Client';
+                    console.log('✅ Created client using window.xrpl.js.Client');
+                } catch (e) {
+                    console.log('❌ window.xrpl.js.Client failed:', e.message);
+                }
+            }
+            
+            // Method 3: Direct xrpl.js object pattern
+            if (!client && window.xrpl && window.xrpl.js && typeof window.xrpl.js === 'object') {
+                // Try common XRPL.js exports
+                const possibleClients = ['Client', 'XrplApi', 'default'];
+                for (const clientName of possibleClients) {
+                    if (window.xrpl.js[clientName] && typeof window.xrpl.js[clientName] === 'function') {
+                        try {
+                            client = new window.xrpl.js[clientName](this.serverUrl);
+                            clientType = `xrpl.js.${clientName}`;
+                            console.log(`✅ Created client using window.xrpl.js.${clientName}`);
+                            break;
+                        } catch (e) {
+                            console.log(`❌ window.xrpl.js.${clientName} failed:`, e.message);
+                        }
+                    }
+                }
+            }
+            
+            // Method 4: ES6 module default export
             if (!client && window.xrpl && window.xrpl.default && typeof window.xrpl.default.Client === 'function') {
                 try {
                     client = new window.xrpl.default.Client(this.serverUrl);
@@ -43,11 +72,6 @@ export class XRPLClient {
                     console.log('❌ window.xrpl.default.Client failed:', e.message);
                 }
             }
-            
-            // Method 3: Try if xrpl itself is a constructor
-            if (!client && window.xrpl && typeof window.xrpl === 'function') {
-                try {
-                    client = new window.xrpl(this.serverUrl);
                     clientType = 'xrpl constructor';
                     console.log('✅ Created client using window.xrpl as constructor');
                 } catch (e) {
@@ -76,7 +100,6 @@ export class XRPLClient {
                             console.log(`❌ window.xrpl.${name} failed:`, e.message);
                         }
                     }
-                }
                 }
             }
 
