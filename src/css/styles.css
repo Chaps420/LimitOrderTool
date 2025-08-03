@@ -520,6 +520,51 @@ select.form-control optgroup option {
     font-weight: 700;
 }
 
+/* Xaman QR Code Styles */
+.xaman-qr-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.xaman-logo {
+    font-size: 18px;
+    font-weight: bold;
+    color: #ffc107;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.xaman-instructions {
+    text-align: center;
+    color: #e9ecef;
+}
+
+.xaman-instructions p {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+}
+
+.xaman-instructions a {
+    display: inline-block;
+    padding: 8px 16px;
+    background: rgba(255, 193, 7, 0.1);
+    border: 1px solid #ffc107;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+}
+
+.xaman-instructions a:hover {
+    background: rgba(255, 193, 7, 0.2);
+    transform: translateY(-1px);
+}
+
 /* Form Actions */
 .form-actions {
     display: flex;

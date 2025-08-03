@@ -151,14 +151,25 @@ export class WalletConnectorFirebase {
                 // Create Xaman payload via Firebase
                 const payloadResult = await this.createXamanPayload(payload);
                 
-                if (payloadResult.uuid) {
-                    // Generate QR code
-                    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(payloadResult.next.always)}`;
+                if (payloadResult.uuid && payloadResult.next) {
+                    // Use Xaman's proper QR code that opens directly in the app
+                    const xamanUrl = payloadResult.next.always;
                     
                     const qrContainer = document.getElementById('xamanQRContainer');
                     if (qrContainer) {
                         qrContainer.innerHTML = `
-                            <img src="${qrUrl}" alt="Xaman QR Code" style="width: 256px; height: 256px; border: 2px solid #ffc107; border-radius: 8px;">
+                            <div class="xaman-qr-wrapper">
+                                <div class="xaman-logo">📱 Xaman</div>
+                                <img src="https://xumm.app/api/v1/platform/qr/${payloadResult.uuid}" 
+                                     alt="Xaman QR Code" 
+                                     style="width: 256px; height: 256px; border: 2px solid #ffc107; border-radius: 8px; background: white; padding: 8px;">
+                                <div class="xaman-instructions">
+                                    <p>Scan with Xaman app to connect</p>
+                                    <a href="${xamanUrl}" target="_blank" style="color: #ffc107; text-decoration: none; font-size: 14px;">
+                                        Or tap here on mobile →
+                                    </a>
+                                </div>
+                            </div>
                         `;
                     }
                     
