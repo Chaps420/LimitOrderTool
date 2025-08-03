@@ -138,10 +138,18 @@ export class WalletConnectorGitHub {
                     console.log('🔗 QR Code URL:', signInPayload.refs?.qr_png);
                     console.log('📱 Xaman Deep Link:', signInPayload.next?.always);
                     
-                    // Show QR code modal for wallet connection
+                    // Show QR code modal for wallet connection ONLY
                     if (signInPayload.refs?.qr_png) {
                         if (typeof window.showQRModal === 'function') {
-                            console.log('📱 Showing QR modal for wallet connection...');
+                            console.log('📱 Showing QR modal for WALLET CONNECTION only...');
+                            // Update modal title to be clear this is for connection
+                            const modal = document.getElementById('qrModal');
+                            if (modal) {
+                                const header = modal.querySelector('.qr-modal-header h3');
+                                if (header) {
+                                    header.textContent = '🔗 Connect Wallet - Scan with Xaman App';
+                                }
+                            }
                             window.showQRModal(signInPayload.refs.qr_png, signInPayload.next?.always);
                         } else {
                             // Fallback: open Xaman link directly
@@ -170,9 +178,9 @@ export class WalletConnectorGitHub {
                             this.walletAddress = account;
                             this.walletType = 'xaman';
                             
-                            // Hide QR modal
-                            if (typeof window.hideQRModal === 'function') {
-                                window.hideQRModal();
+                            // Hide QR modal after successful connection
+                            if (typeof window.closeQRModal === 'function') {
+                                window.closeQRModal();
                             }
                             
                             // Call connection callback
@@ -200,8 +208,8 @@ export class WalletConnectorGitHub {
                 console.error('🚫 SignIn failed:', signInError);
                 
                 // Hide QR modal on error
-                if (typeof window.hideQRModal === 'function') {
-                    window.hideQRModal();
+                if (typeof window.closeQRModal === 'function') {
+                    window.closeQRModal();
                 }
                 
                 // Provide specific error messages based on common issues
