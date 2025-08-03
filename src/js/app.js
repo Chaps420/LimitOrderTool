@@ -1004,16 +1004,18 @@ class App {
                     
                     console.log(`📝 Order ${index + 1}: ${quantity} ${currency} for ${totalXrp} XRP`);
                     
-                    // Create XRPL transaction format for SELL orders
-                    // TakerPays = what we want to receive (XRP)
-                    // TakerGets = what we're selling (tokens)
+                    // Create proper XRPL OfferCreate transaction
                     orders.push({
-                        takerPays: Math.floor(totalXrp * 1000000).toString(), // XRP in drops (what we receive)
-                        takerGets: {
+                        TransactionType: 'OfferCreate',
+                        Account: this.walletAddress,
+                        TakerPays: Math.floor(totalXrp * 1000000).toString(), // XRP in drops (what we receive)
+                        TakerGets: {
                             currency: currency,
                             issuer: issuer,
                             value: quantity.toString()
-                        } // Tokens (what we're selling) - remove sequence as XRPL will set it
+                        }, // Tokens (what we're selling)
+                        Fee: "12", // Default fee in drops
+                        Flags: 0
                     });
                 });
                 

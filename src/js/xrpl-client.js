@@ -148,193 +148,118 @@ export class XRPLClient {
         }
 
         try {
-            console.log('🔍 Getting token info for currency:', currency, 'issuer:', issuer);
+            console.log('🔍 Getting real-time token supply for:', currency, 'issuer:', issuer);
             
-            // Method 1: Try to get from known token data first
-            const knownSupply = this.getKnownTokenSupply(currency, issuer);
-            if (knownSupply) {
-                console.log('📊 Using known supply for', currency, ':', knownSupply);
-                return {
-                    currency: currency,
-                    issuer: issuer,
-                    totalSupply: knownSupply
-                };
-            }
-
-            // Method 2: Try external API for token data
-            try {
-                const externalSupply = await this.getTokenSupplyFromAPI(currency, issuer);
-                if (externalSupply) {
-                    console.log('📊 Got supply from external API for', currency, ':', externalSupply);
-                    return {
-                        currency: currency,
-                        issuer: issuer,
-                        totalSupply: externalSupply
-                    };
-                }
-            } catch (apiError) {
-                console.warn('⚠️ External API failed:', apiError.message);
-            }
-
-            // Method 3: Calculate from XRPL data (fallback)
-            const calculatedSupply = await this.calculateTokenSupplyFromXRPL(currency, issuer);
-            if (calculatedSupply) {
-                console.log('📊 Calculated supply from XRPL for', currency, ':', calculatedSupply);
-                return {
-                    currency: currency,
-                    issuer: issuer,
-                    totalSupply: calculatedSupply
-                };
-            }
-
-            console.warn('⚠️ Could not determine supply for', currency);
-            return {
-                currency: currency,
-                issuer: issuer,
-                totalSupply: null
-            };
-
-        } catch (error) {
-            console.error('❌ Error getting token info:', error);
-            return {
-                currency: currency,
-                issuer: issuer,
-                totalSupply: null
-            };
-        }
-    }
-
-    getKnownTokenSupply(currency, issuer) {
-        // Database of known XRPL token supplies (updated with accurate data)
-        const knownTokens = {
-            // UGA - Uganadan Gaming Association
-            'UGA:rBFJGmWj6YaabVCxfsjiCM8pfYXs8xFdeC': 7900000,
-            // SOLO - Sologenic
-            'SOLO:rHZwvHEs56GCmHupwjA4RY7oPA3EoAJWuN': 400000000,
-            // CORE - CoreDAO
-            'CORE:rcoreNywaoz2ZCQ8Lg2EbSLnGuRBmun6D': 10000000000,
-            // CSC - CasinoCoin
-            'CSC:rCSCManTZ8ME9EoLrSHHYKW8PPwWMgkwr': 80000000000,
-            // FPT - Faucet Pay Token
-            'FPT:rBXRBN9gSFE4qL6DGWYHgKCLtoMzUVL5cF': 1000000000,
-            // NPS - Neos Credits
-            'NPS:rMGGhcxk1cH8tRCF5cLbXCTFmUwSNYYM2G': 1000000000,
-            // RUN - RUN Token
-            'RUN:r9sDVHrAmGhzN9AcQLU5teWzKo8dgfPhoC': 1000000000,
-            // NLK - NuLink
-            'NLK:rhL39pbBQcMMcYoaiXaunuYDcCv41ZbF4f': 5000000000,
-            // ROX - ROX Token
-            'ROX:raaMMCq9QMYwQ6YhesV3gdpAGf1GhugCRu': 1000000000,
-            // FIN - FIN Token
-            'FIN:rEJqyQCiqJgqWXLMMJ8cyLwBJUvBA9xmUA': 1000000000,
-            // MJK - MJK Token
-            'MJK:rGMPf7iW6S6bsYfQWVBRqfhyEBfZeG3c42': 1000000000,
-            // Cub - Cub Finance
-            'Cub:rN5yEd16jvqcVW1UA4kZxZ3jUA9Es85QgD': 1000000000,
-            // BANANA
-            'BANANA:rPopnAhPWZXiWApiPM5EHQ6ksLEhvGiLqP': 21000000000,
-            // IMM - Immutable
-            'IMM:rH1znLFaK7wtmDGRSu4WPEqHCuofuJHdHP': 10000000000,
-            // BURN token
-            'BURN:rwgNTwrsZKPe7xYCy4emjFAYpgnuioHSkd': 1000000000,
-            // XRP (native)
-            'XRP': 100000000000,
-        };
-
-        const key = `${currency}:${issuer}`;
-        return knownTokens[key] || null;
-    }
-
-    async getTokenSupplyFromAPI(currency, issuer) {
-        try {
-            // Try xrpscan.com API for token data
-            const response = await fetch(`https://api.xrpscan.com/api/v1/account/${issuer}/tokens`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                const tokenData = data.find(token => token.currency === currency);
-                if (tokenData && tokenData.totalSupply) {
-                    return parseFloat(tokenData.totalSupply);
-                }
-            }
-        } catch (error) {
-            console.warn('XRPScan API failed:', error.message);
-        }
-
-        try {
-            // Try alternative: XRPL.org token registry
-            const response = await fetch(`https://api.xrpl.org/tokens/${currency}/${issuer}`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                if (data.totalSupply) {
-                    return parseFloat(data.totalSupply);
-                }
-            }
-        } catch (error) {
-            console.warn('XRPL.org API failed:', error.message);
-        }
-
-        return null;
-    }
-
-    async calculateTokenSupplyFromXRPL(currency, issuer) {
-        try {
-            // Get gateway balances for a more accurate calculation
-            const gatewayBalancesRequest = {
+            // Use gateway_balances command to get accurate token supply
+            const request = {
                 command: 'gateway_balances',
                 account: issuer,
                 ledger_index: 'validated'
             };
 
-            const response = await this.client.request(gatewayBalancesRequest);
+            console.log('📡 Sending gateway_balances request:', request);
+            const response = await this.client.request(request);
             
-            if (response.result && response.result.obligations && response.result.obligations[currency]) {
-                const supply = parseFloat(response.result.obligations[currency]);
-                if (supply > 0) {
-                    return supply;
+            console.log('📊 Gateway balances response:', response);
+            
+            if (response.result && response.result.obligations) {
+                const obligations = response.result.obligations;
+                
+                // Check if our currency exists in obligations
+                if (obligations[currency]) {
+                    const totalSupply = parseFloat(obligations[currency]);
+                    console.log('✅ Found total supply for', currency, ':', totalSupply);
+                    
+                    return {
+                        currency: currency,
+                        issuer: issuer,
+                        totalSupply: totalSupply
+                    };
+                }
+                
+                // Also check for hex-encoded currency codes
+                for (const [key, value] of Object.entries(obligations)) {
+                    if (key === currency) {
+                        const totalSupply = parseFloat(value);
+                        console.log('✅ Found total supply for', currency, '(hex match):', totalSupply);
+                        
+                        return {
+                            currency: currency,
+                            issuer: issuer,
+                            totalSupply: totalSupply
+                        };
+                    }
                 }
             }
+            
+            console.warn('⚠️ No obligations found for currency:', currency);
+            console.log('📋 Available obligations:', response.result?.obligations ? Object.keys(response.result.obligations) : 'None');
+            
+            // Fallback: Try account_lines approach for more detailed analysis
+            return await this.getTokenSupplyFromAccountLines(currency, issuer);
+            
+        } catch (error) {
+            console.error('❌ Error getting token info:', error);
+            
+            // Try fallback method
+            return await this.getTokenSupplyFromAccountLines(currency, issuer);
+        }
+    }
 
-            // Fallback: Calculate from account lines
-            const accountLinesRequest = {
+    async getTokenSupplyFromAccountLines(currency, issuer) {
+        try {
+            console.log('🔄 Fallback: Getting token supply from account lines...');
+            
+            const request = {
                 command: 'account_lines',
                 account: issuer,
                 ledger_index: 'validated'
             };
 
-            const linesResponse = await this.client.request(accountLinesRequest);
+            const response = await this.client.request(request);
             
-            if (!linesResponse.result || !linesResponse.result.lines) {
-                return null;
+            if (!response.result || !response.result.lines) {
+                console.warn('⚠️ No account lines found');
+                return {
+                    currency: currency,
+                    issuer: issuer,
+                    totalSupply: null
+                };
             }
 
-            let totalSupply = 0;
-            for (const line of linesResponse.result.lines) {
+            // Calculate total issued by summing negative balances
+            let totalIssued = 0;
+            let lineCount = 0;
+            
+            for (const line of response.result.lines) {
                 if (line.currency === currency) {
+                    lineCount++;
                     const balance = parseFloat(line.balance);
+                    
+                    // Negative balances represent tokens the issuer has issued (owes)
                     if (balance < 0) {
-                        // Negative balance means tokens issued by this issuer
-                        totalSupply += Math.abs(balance);
+                        totalIssued += Math.abs(balance);
                     }
+                    
+                    console.log(`📋 Line ${lineCount}: ${balance} ${currency} to ${line.account.substring(0, 8)}...`);
                 }
             }
 
-            return totalSupply > 0 ? totalSupply : null;
-
+            console.log(`📊 Total calculated supply from ${lineCount} lines:`, totalIssued);
+            
+            return {
+                currency: currency,
+                issuer: issuer,
+                totalSupply: totalIssued > 0 ? totalIssued : null
+            };
+            
         } catch (error) {
-            console.error('Error calculating supply from XRPL:', error);
-            return null;
+            console.error('❌ Error in account lines fallback:', error);
+            return {
+                currency: currency,
+                issuer: issuer,
+                totalSupply: null
+            };
         }
     }
 

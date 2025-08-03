@@ -175,6 +175,12 @@ export class WalletConnectorGitHub {
             }
             
             console.log('📝 Creating transaction payload with Xaman SDK...');
+            console.log('📋 Transaction details:', transaction);
+            
+            // Validate transaction has required fields
+            if (!transaction.TransactionType || !transaction.Account) {
+                throw new Error('Invalid transaction format - missing required fields');
+            }
             
             // Create payload using Xaman SDK
             const payload = await this.xumm.payload.create({
@@ -186,7 +192,9 @@ export class WalletConnectorGitHub {
                 }
             });
             
-            if (payload.uuid) {
+            console.log('📦 Payload creation response:', payload);
+            
+            if (payload && payload.uuid) {
                 console.log('✅ Payload created:', payload.uuid);
                 
                 // Subscribe to payload updates
@@ -197,10 +205,12 @@ export class WalletConnectorGitHub {
                 return { success: !!result.signed, transaction: result };
             }
             
-            throw new Error('Failed to create transaction payload');
+            console.error('❌ Payload creation failed - no UUID returned');
+            throw new Error('Failed to create transaction payload - no UUID returned');
             
         } catch (error) {
             console.error('❌ Xaman signing error:', error);
+            console.error('❌ Error details:', error.response?.data || error.message);
             throw new Error(`Xaman signing failed: ${error.message}`);
         }
     }
