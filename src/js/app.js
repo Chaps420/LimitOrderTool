@@ -22,6 +22,26 @@ class App {
         this.init();
     }
 
+    async waitForXRPLLibrary() {
+        // Wait up to 10 seconds for XRPL library to load
+        const maxWait = 10000;
+        const checkInterval = 100;
+        let waited = 0;
+        
+        console.log('⏳ Waiting for XRPL library to load...');
+        
+        while (!window.xrpl && waited < maxWait) {
+            await new Promise(resolve => setTimeout(resolve, checkInterval));
+            waited += checkInterval;
+        }
+        
+        if (!window.xrpl) {
+            throw new Error('XRPL library failed to load after 10 seconds');
+        }
+        
+        console.log('✅ XRPL library is ready');
+    }
+
     /**
      * Auto-detect if backend is available, switch to standalone if not
      */
@@ -106,7 +126,7 @@ class App {
         const projectId = 'xrpl-limit-order-tool';
         
         // For local development, use Firebase emulator
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
             return `http://localhost:5001/${projectId}/us-central1/api`;
         }
         
@@ -208,6 +228,9 @@ class App {
     }
 
     async init() {
+        // Wait for XRPL library to be fully loaded
+        await this.waitForXRPLLibrary();
+        
         // First, detect and initialize the appropriate wallet connector
         await this.detectAndInitializeWalletConnector();
         
