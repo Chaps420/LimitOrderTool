@@ -1,6 +1,6 @@
 /**
  * GitHub Pages Wallet Connector
- * Direct Xaman API integration with credentials from environment
+ * Uses Xaman JavaScript SDK for direct browser integration (CORS-friendly)
  */
 
 export class WalletConnectorGitHub {
@@ -9,17 +9,72 @@ export class WalletConnectorGitHub {
         this.walletAddress = null;
         this.walletType = null;
         this.onConnect = null;
+        this.xumm = null;
         
-        // Xaman API credentials - configured for production use
-        this.xamanConfig = {
-            apiKey: '1ee24ba3-7f93-4f63-8ad3-ee605f38eb2d',
-            apiSecret: '816a9b89-e281-4468-b5ce-8fbf333d9495',
-            baseUrl: 'https://xumm.app/api/v1/platform'
-        };
+        // Xaman API key for SDK initialization
+        this.xamanApiKey = '1ee24ba3-7f93-4f63-8ad3-ee605f38eb2d';
+        
+        // Initialize Xaman SDK
+        this.initializeXamanSDK();
+    }
+
+    async initializeXamanSDK() {
+        try {
+            // Load Xaman SDK if not already loaded
+            if (!window.Xumm) {
+                console.log('📦 Loading Xaman SDK...');
+                await this.loadXamanSDK();
+            }
+            
+            // Initialize Xaman SDK
+            this.xumm = new window.Xumm(this.xamanApiKey);
+            
+            // Set up event listeners
+            this.xumm.on("ready", () => {
+                console.log("✅ Xaman SDK ready");
+            });
+            
+            this.xumm.on("success", async () => {
+                console.log("🎉 Xaman user authenticated");
+                const account = await this.xumm.user.account;
+                if (account) {
+                    this.isConnected = true;
+                    this.walletAddress = account;
+                    this.walletType = 'xaman';
+                    
+                    if (this.onConnect) {
+                        this.onConnect(this.walletAddress);
+                    }
+                }
+            });
+            
+            this.xumm.on("logout", () => {
+                console.log("👋 Xaman user logged out");
+                this.disconnect();
+            });
+            
+        } catch (error) {
+            console.error('❌ Failed to initialize Xaman SDK:', error);
+        }
+    }
+
+    async loadXamanSDK() {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://xumm.app/assets/cdn/xumm.min.js';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
     }
 
     async connect() {
         console.log('🔗 GitHub Pages wallet connect called');
+        
+        // Ensure Xaman SDK is ready
+        if (!this.xumm) {
+            await this.initializeXamanSDK();
+        }
         
         // Only try Xaman - this is a Xaman-focused tool
         try {
@@ -37,9 +92,9 @@ export class WalletConnectorGitHub {
 
     async connectXaman() {
         try {
-            // Check if Xaman is available in the environment
+            // Check if Xaman is available in the environment (mobile app)
             if (!window.ReactNativeWebView && !this.isXamanEnvironment()) {
-                // Use direct Xaman API for web-based connection
+                // Use Xaman SDK for web-based connection
                 return await this.connectXamanWeb();
             }
             
@@ -58,40 +113,18 @@ export class WalletConnectorGitHub {
 
     async connectXamanWeb() {
         try {
-            // Create sign-in payload for Xaman
-            const payload = {
-                txjson: {
-                    TransactionType: 'SignIn'
-                },
-                options: {
-                    submit: false,
-                    multisign: false,
-                    expire: 5
-                },
-                custom_meta: {
-                    identifier: 'xrpl-limit-order-tool',
-                    blob: {
-                        purpose: 'Connect wallet to XRPL Limit Order Tool'
-                    }
-                }
-            };
-
-            // Show QR modal for Xaman connection
-            const result = await this.showXamanQRModal(payload);
-            
-            if (result.signed && result.account) {
-                this.isConnected = true;
-                this.walletAddress = result.account;
-                this.walletType = 'xaman';
-                
-                if (this.onConnect) {
-                    this.onConnect(this.walletAddress);
-                }
-                
-                return { success: true, address: this.walletAddress };
+            if (!this.xumm) {
+                throw new Error('Xaman SDK not initialized');
             }
             
-            throw new Error('Xaman connection cancelled or failed');
+            console.log('🔐 Starting Xaman SDK authorization...');
+            
+            // Use Xaman SDK authorize method - this handles QR codes and mobile redirects automatically
+            await this.xumm.authorize();
+            
+            // If we get here, authorization was successful
+            // The SDK will trigger the "success" event and handle account connection
+            return { success: true, address: this.walletAddress };
             
         } catch (error) {
             console.error('Xaman web connection error:', error);
@@ -99,186 +132,41 @@ export class WalletConnectorGitHub {
         }
     }
 
-    async showXamanQRModal(payload) {
-        return new Promise(async (resolve, reject) => {
-            try {
-                // Create modal HTML
-                const modalHTML = `
-                    <div id="xamanModal" class="qr-modal-overlay">
-                        <div class="qr-modal-content">
-                            <div class="qr-modal-header">
-                                <h3>🔗 Connect with Xaman</h3>
-                                <button class="qr-modal-close" onclick="this.closest('.qr-modal-overlay').remove()">&times;</button>
-                            </div>
-                            <div class="qr-modal-body">
-                                <div class="qr-instructions">
-                                    <p>1. Open Xaman app on your mobile device</p>
-                                    <p>2. Tap the scan button</p>
-                                    <p>3. Scan this QR code to connect</p>
-                                </div>
-                                <div id="xamanQRContainer" class="qr-container">
-                                    <div class="loading">Creating connection...</div>
-                                </div>
-                                <div class="qr-status" id="xamanStatus">
-                                    Connecting to Xaman...
-                                </div>
-                            </div>
-                            <div class="qr-modal-footer">
-                                <button class="btn btn-secondary" onclick="this.closest('.qr-modal-overlay').remove()">Cancel</button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-
-                // Add modal to page
-                document.body.insertAdjacentHTML('beforeend', modalHTML);
-                
-                // Create Xaman payload directly
-                const payloadResult = await this.createXamanPayload(payload);
-                
-                if (payloadResult.uuid && payloadResult.next) {
-                    // Use Xaman's proper QR code that opens directly in the app
-                    const xamanUrl = payloadResult.next.always;
-                    
-                    const qrContainer = document.getElementById('xamanQRContainer');
-                    if (qrContainer) {
-                        qrContainer.innerHTML = `
-                            <div class="xaman-qr-wrapper">
-                                <div class="xaman-logo">📱 Xaman</div>
-                                <img src="https://xumm.app/api/v1/platform/qr/${payloadResult.uuid}" 
-                                     alt="Xaman QR Code" 
-                                     style="width: 256px; height: 256px; border: 2px solid #ffc107; border-radius: 8px; background: white; padding: 8px;">
-                                <div class="xaman-instructions">
-                                    <p>Scan with Xaman app to connect</p>
-                                    <a href="${xamanUrl}" target="_blank" style="color: #ffc107; text-decoration: none; font-size: 14px;">
-                                        Or tap here on mobile →
-                                    </a>
-                                </div>
-                            </div>
-                        `;
-                    }
-                    
-                    // Poll for result
-                    this.pollXamanResult(payloadResult.uuid, resolve, reject);
-                } else {
-                    reject(new Error('Failed to create Xaman payload'));
-                }
-                
-            } catch (error) {
-                const qrContainer = document.getElementById('xamanQRContainer');
-                if (qrContainer) {
-                    qrContainer.innerHTML = `
-                        <div class="error">Failed to create connection: ${error.message}</div>
-                    `;
-                }
-                reject(error);
-            }
-        });
-    }
-
-    async createXamanPayload(payload) {
+    async signWithXaman(transaction) {
         try {
-            console.log('📝 Creating Xaman payload directly...');
-            console.log('🔑 Using API key:', this.xamanConfig.apiKey.substring(0, 8) + '...');
-            
-            const response = await fetch(`${this.xamanConfig.baseUrl}/payload`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': this.xamanConfig.apiKey,
-                    'X-API-Secret': this.xamanConfig.apiSecret
-                },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Xaman API error: ${response.status} - ${errorText}`);
+            if (!this.xumm) {
+                throw new Error('Xaman SDK not initialized');
             }
-
-            const data = await response.json();
-            console.log('✅ Xaman payload created:', data.uuid);
-            return data;
             
-        } catch (error) {
-            console.error('Xaman payload creation error:', error);
-            throw new Error(`Failed to create connection: ${error.message}`);
-        }
-    }
-
-    async pollXamanResult(uuid, resolve, reject) {
-        const maxAttempts = 60; // 5 minutes
-        let attempts = 0;
-
-        const poll = async () => {
-            attempts++;
+            console.log('📝 Creating transaction payload with Xaman SDK...');
             
-            try {
-                // Check payload status directly with Xaman
-                const response = await fetch(`${this.xamanConfig.baseUrl}/payload/${uuid}`, {
-                    headers: {
-                        'X-API-Key': this.xamanConfig.apiKey,
-                        'X-API-Secret': this.xamanConfig.apiSecret
-                    }
+            // Create payload using Xaman SDK
+            const payload = await this.xumm.payload.create({
+                txjson: transaction,
+                options: {
+                    submit: true,
+                    multisign: false,
+                    expire: 5
+                }
+            });
+            
+            if (payload.uuid) {
+                console.log('✅ Payload created:', payload.uuid);
+                
+                // Subscribe to payload updates
+                const result = await this.xumm.payload.subscribe(payload.uuid, (event) => {
+                    console.log('📡 Payload update:', event);
                 });
                 
-                if (!response.ok) {
-                    throw new Error(`Status check failed: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                
-                // Update status
-                const statusElement = document.getElementById('xamanStatus');
-                if (statusElement) {
-                    if (data.meta?.signed) {
-                        statusElement.textContent = 'Connection successful!';
-                    } else if (data.meta?.cancelled) {
-                        statusElement.textContent = 'Connection cancelled';
-                    } else {
-                        statusElement.textContent = `Waiting for signature... (${60 - attempts}s remaining)`;
-                    }
-                }
-                
-                // Check if signed
-                if (data.meta?.signed && data.response?.account) {
-                    const modal = document.getElementById('xamanModal');
-                    if (modal) modal.remove();
-                    
-                    resolve({
-                        signed: true,
-                        account: data.response.account
-                    });
-                    return;
-                }
-                
-                // Check if cancelled
-                if (data.meta?.cancelled) {
-                    const modal = document.getElementById('xamanModal');
-                    if (modal) modal.remove();
-                    reject(new Error('Connection cancelled by user'));
-                    return;
-                }
-                
-                // Check timeout
-                if (attempts >= maxAttempts) {
-                    const modal = document.getElementById('xamanModal');
-                    if (modal) modal.remove();
-                    reject(new Error('Connection timeout'));
-                    return;
-                }
-
-                // Continue polling
-                setTimeout(poll, 5000);
-                
-            } catch (error) {
-                const modal = document.getElementById('xamanModal');
-                if (modal) modal.remove();
-                reject(error);
+                return { success: !!result.signed, transaction: result };
             }
-        };
-
-        poll();
+            
+            throw new Error('Failed to create transaction payload');
+            
+        } catch (error) {
+            console.error('❌ Xaman signing error:', error);
+            throw new Error(`Xaman signing failed: ${error.message}`);
+        }
     }
 
     async connectGemWallet() {
@@ -341,7 +229,7 @@ export class WalletConnectorGitHub {
         }
 
         try {
-            console.log(`🔄 Creating ${orders.length} orders...`);
+            console.log(`🔄 Creating ${orders.length} orders with Xaman SDK...`);
             
             const results = {
                 success: false,
@@ -350,7 +238,7 @@ export class WalletConnectorGitHub {
                 transactions: []
             };
 
-            // Sign orders one by one
+            // Sign orders one by one using Xaman SDK
             for (let i = 0; i < orders.length; i++) {
                 const order = orders[i];
                 
@@ -390,21 +278,6 @@ export class WalletConnectorGitHub {
         }
     }
 
-    async signWithXaman(transaction) {
-        // Create Xaman signing payload
-        const payload = {
-            txjson: transaction,
-            options: {
-                submit: true,
-                multisign: false,
-                expire: 5
-            }
-        };
-
-        const result = await this.showXamanQRModal(payload);
-        return { success: result.signed, transaction: result };
-    }
-
     async signWithGem(transaction) {
         try {
             const result = await window.gem.submitTransaction(transaction);
@@ -435,5 +308,10 @@ export class WalletConnectorGitHub {
         this.isConnected = false;
         this.walletAddress = null;
         this.walletType = null;
+        
+        // Logout from Xaman SDK if available
+        if (this.xumm) {
+            this.xumm.logout();
+        }
     }
 }
