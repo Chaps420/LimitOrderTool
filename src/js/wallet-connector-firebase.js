@@ -187,7 +187,7 @@ export class WalletConnectorFirebase {
         try {
             console.log('📝 Creating Xaman payload via Firebase...');
             
-            const response = await fetch(`${this.baseUrl}/xaman/payload`, {
+            const response = await fetch(`${this.baseUrl.replace('/api', '')}/api/xaman/payload`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -218,7 +218,7 @@ export class WalletConnectorFirebase {
             
             try {
                 // Check payload status via Firebase
-                const response = await fetch(`${this.baseUrl}/xaman/payload/${uuid}`);
+                const response = await fetch(`${this.baseUrl.replace('/api', '')}/api/xaman/payload/${uuid}`);
                 
                 if (!response.ok) {
                     throw new Error(`Status check failed: ${response.status}`);

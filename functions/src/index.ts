@@ -35,7 +35,7 @@ app.get('/health', (req: any, res: any) => {
 });
 
 // Xaman API proxy endpoints
-app.post('/api/xaman/payload', async (req: any, res: any) => {
+app.post('/xaman/payload', async (req: any, res: any) => {
   try {
     console.log('Creating Xaman payload:', req.body);
     
@@ -85,7 +85,7 @@ app.post('/api/xaman/payload', async (req: any, res: any) => {
 });
 
 // Get Xaman payload status
-app.get('/api/xaman/payload/:uuid', async (req: any, res: any) => {
+app.get('/xaman/payload/:uuid', async (req: any, res: any) => {
   try {
     const { uuid } = req.params;
     console.log('Getting Xaman payload status:', uuid);
@@ -134,7 +134,7 @@ app.get('/api/xaman/payload/:uuid', async (req: any, res: any) => {
 });
 
 // Delete Xaman payload
-app.delete('/api/xaman/payload/:uuid', async (req: any, res: any) => {
+app.delete('/xaman/payload/:uuid', async (req: any, res: any) => {
   try {
     const { uuid } = req.params;
     console.log('Deleting Xaman payload:', uuid);
