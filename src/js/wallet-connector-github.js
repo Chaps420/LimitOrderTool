@@ -26,7 +26,11 @@ export class WalletConnectorGitHub {
                 await this.loadXamanSDK();
             }
             
-            // Initialize Xaman SDK
+            // Initialize Xaman SDK with debugging
+            console.log('🔧 Initializing Xaman SDK...');
+            console.log('🌐 Current URL:', window.location.href);
+            console.log('🔑 API Key:', this.xamanApiKey.substring(0, 8) + '...');
+            
             this.xumm = new window.Xumm(this.xamanApiKey);
             
             // Set up event listeners
@@ -53,8 +57,17 @@ export class WalletConnectorGitHub {
                 this.disconnect();
             });
             
+            this.xumm.on("error", (error) => {
+                console.error("❌ Xaman SDK error:", error);
+            });
+            
         } catch (error) {
             console.error('❌ Failed to initialize Xaman SDK:', error);
+            
+            // Show user-friendly error message about redirect URL
+            if (error.message && error.message.includes('redirect')) {
+                throw new Error('Redirect URL not configured. Please contact the app developer to add this domain to the Xaman app configuration.');
+            }
         }
     }
 
@@ -118,13 +131,36 @@ export class WalletConnectorGitHub {
             }
             
             console.log('🔐 Starting Xaman SDK authorization...');
+            console.log('🌐 Current domain:', window.location.hostname);
+            console.log('📋 Full URL:', window.location.href);
+            
+            // Check if we're in a supported environment
+            if (window.location.protocol === 'file:') {
+                throw new Error('Xaman SDK requires HTTP/HTTPS protocol. Please use a web server.');
+            }
             
             // Use Xaman SDK authorize method - this handles QR codes and mobile redirects automatically
-            await this.xumm.authorize();
-            
-            // If we get here, authorization was successful
-            // The SDK will trigger the "success" event and handle account connection
-            return { success: true, address: this.walletAddress };
+            try {
+                await this.xumm.authorize();
+                
+                // If we get here, authorization was successful
+                // The SDK will trigger the "success" event and handle account connection
+                return { success: true, address: this.walletAddress };
+                
+            } catch (authError) {
+                console.error('🚫 Authorization failed:', authError);
+                
+                // Provide specific error messages based on common issues
+                if (authError.message && authError.message.includes('redirect')) {
+                    throw new Error('❌ Redirect URL not configured.\n\nTo fix this:\n1. Go to https://apps.xumm.dev/\n2. Add this URL to your app: ' + window.location.origin);
+                }
+                
+                if (authError.message && authError.message.includes('access_denied')) {
+                    throw new Error('❌ Access denied. Please ensure:\n1. Your domain is added to Xaman app settings\n2. The API key is correct\n3. You have proper permissions');
+                }
+                
+                throw authError;
+            }
             
         } catch (error) {
             console.error('Xaman web connection error:', error);
