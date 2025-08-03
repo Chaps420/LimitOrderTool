@@ -143,13 +143,73 @@ export class XRPLClient {
     }
 
     async getTokenInfo(currency, issuer) {
-        // This would require additional API calls to get token metadata
-        // For now, return basic info
-        return {
-            currency: currency,
-            issuer: issuer,
-            totalSupply: null // Would need to query issuer's account or use external API
-        };
+        if (!this.isConnected || !this.client) {
+            throw new Error('Not connected to XRPL');
+        }
+
+        try {
+            console.log('🔍 Getting token info for currency:', currency, 'issuer:', issuer);
+            
+            // Get account lines to find token supply information
+            const accountLinesRequest = {
+                command: 'account_lines',
+                account: issuer,
+                ledger_index: 'validated'
+            };
+
+            const response = await this.client.request(accountLinesRequest);
+            
+            if (!response.result || !response.result.lines) {
+                console.warn('⚠️ No account lines found for issuer:', issuer);
+                return {
+                    currency: currency,
+                    issuer: issuer,
+                    totalSupply: null
+                };
+            }
+
+            // Calculate total supply by summing all outstanding balances for this currency
+            let totalSupply = 0;
+            let foundCurrency = false;
+            
+            for (const line of response.result.lines) {
+                if (line.currency === currency) {
+                    foundCurrency = true;
+                    // Balance represents what the issuer owes (negative) or what others owe (positive)
+                    // For tokens, the issuer typically has negative balances (tokens they've issued)
+                    const balance = parseFloat(line.balance);
+                    if (balance < 0) {
+                        // Negative balance means tokens issued by this issuer
+                        totalSupply += Math.abs(balance);
+                    }
+                }
+            }
+
+            if (!foundCurrency) {
+                console.warn('⚠️ Currency not found in issuer account lines:', currency);
+                return {
+                    currency: currency,
+                    issuer: issuer,
+                    totalSupply: null
+                };
+            }
+
+            console.log('📊 Calculated total supply for', currency, ':', totalSupply);
+            
+            return {
+                currency: currency,
+                issuer: issuer,
+                totalSupply: totalSupply > 0 ? totalSupply : null
+            };
+
+        } catch (error) {
+            console.error('❌ Error getting token info:', error);
+            return {
+                currency: currency,
+                issuer: issuer,
+                totalSupply: null
+            };
+        }
     }
 
     async submitTransaction(transaction) {
