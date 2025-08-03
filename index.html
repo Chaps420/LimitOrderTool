@@ -238,10 +238,129 @@
                 </section>
             </div>
         </main>
+        
+        <!-- QR Code Modal -->
+        <div id="qrModal" class="qr-modal" style="display: none;">
+            <div class="qr-modal-overlay" onclick="closeQRModal()"></div>
+            <div class="qr-modal-content">
+                <div class="qr-modal-header">
+                    <h3>🔗 Scan QR Code with Xaman App</h3>
+                    <button class="qr-close-btn" onclick="closeQRModal()">&times;</button>
+                </div>
+                <div class="qr-modal-body">
+                    <div class="qr-code-container">
+                        <div id="qrCodeDisplay" class="qr-code-display">
+                            <div class="qr-loading">
+                                <div class="spinner"></div>
+                                <p>Generating QR Code...</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="qr-instructions">
+                        <p>📱 <strong>Instructions:</strong></p>
+                        <ol>
+                            <li>Open the Xaman app on your phone</li>
+                            <li>Tap the "Scan" button or QR scanner</li>
+                            <li>Point your camera at the QR code above</li>
+                            <li>Review and sign the transaction in the app</li>
+                        </ol>
+                        <div class="qr-status" id="qrStatus">
+                            Waiting for you to scan and sign...
+                        </div>
+                    </div>
+                </div>
+                <div class="qr-modal-footer">
+                    <button onclick="copyXamanLink()" class="btn btn-secondary">📋 Copy Deep Link</button>
+                    <button onclick="closeQRModal()" class="btn btn-secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts -->
     <script>
+        // QR Modal Functions (Global)
+        let currentXamanLink = '';
+        
+        window.showQRModal = function(qrCodeUrl, xamanLink) {
+            console.log('📱 Showing QR modal with URL:', qrCodeUrl);
+            currentXamanLink = xamanLink || qrCodeUrl;
+            
+            const modal = document.getElementById('qrModal');
+            const qrDisplay = document.getElementById('qrCodeDisplay');
+            
+            // Show modal
+            modal.style.display = 'flex';
+            
+            // Clear previous content and show loading
+            qrDisplay.innerHTML = `
+                <div class="qr-loading">
+                    <div class="spinner"></div>
+                    <p>Generating QR Code...</p>
+                </div>
+            `;
+            
+            // Generate QR code
+            setTimeout(() => {
+                qrDisplay.innerHTML = `<img src="${qrCodeUrl}" alt="QR Code for Xaman" class="qr-code-image" style="max-width: 256px; width: 100%; height: auto;">`;
+            }, 500);
+        };
+        
+        window.closeQRModal = function() {
+            const modal = document.getElementById('qrModal');
+            modal.style.display = 'none';
+            currentXamanLink = '';
+        };
+        
+        window.updateQRStatus = function(message, type = 'info') {
+            const qrStatus = document.getElementById('qrStatus');
+            if (qrStatus) {
+                qrStatus.textContent = message;
+                qrStatus.className = 'qr-status';
+                if (type === 'success') {
+                    qrStatus.style.background = 'rgba(40, 167, 69, 0.2)';
+                    qrStatus.style.borderColor = 'rgba(40, 167, 69, 0.5)';
+                    qrStatus.style.color = '#28a745';
+                } else if (type === 'error') {
+                    qrStatus.style.background = 'rgba(220, 53, 69, 0.2)';
+                    qrStatus.style.borderColor = 'rgba(220, 53, 69, 0.5)';
+                    qrStatus.style.color = '#dc3545';
+                } else {
+                    qrStatus.style.background = 'rgba(255, 193, 7, 0.1)';
+                    qrStatus.style.borderColor = 'rgba(255, 193, 7, 0.3)';
+                    qrStatus.style.color = '#ffc107';
+                }
+            }
+        };
+        
+        function copyXamanLink() {
+            if (currentXamanLink) {
+                navigator.clipboard.writeText(currentXamanLink).then(() => {
+                    // Show success feedback
+                    const btn = event.target;
+                    const originalText = btn.textContent;
+                    btn.textContent = '✅ Copied!';
+                    btn.style.background = '#28a745';
+                    
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                        btn.style.background = '';
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy link:', err);
+                    // Fallback: show the link in an alert
+                    alert('Copy this link to your clipboard:\n\n' + currentXamanLink);
+                });
+            }
+        }
+        
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                window.closeQRModal();
+            }
+        });
+        
         // Wait for XRPL library to load before initializing the app
         async function waitForXRPL() {
             let attempts = 0;

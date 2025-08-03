@@ -196,11 +196,54 @@ export class WalletConnectorGitHub {
             
             if (payload && payload.uuid) {
                 console.log('✅ Payload created:', payload.uuid);
+                console.log('🔗 QR Code URL:', payload.refs?.qr_png);
+                console.log('📱 Xaman Deep Link:', payload.next?.always);
                 
-                // Subscribe to payload updates
+                // Show QR code modal with the generated QR code
+                if (payload.refs?.qr_png) {
+                    // Use the global function to show QR modal
+                    if (typeof window.showQRModal === 'function') {
+                        window.showQRModal(payload.refs.qr_png, payload.next?.always);
+                        window.updateQRStatus('Waiting for you to scan and sign...', 'info');
+                    } else {
+                        console.warn('QR modal function not available, opening in new tab as fallback');
+                        window.open(payload.next?.always, '_blank');
+                    }
+                } else {
+                    console.warn('No QR code URL in payload response');
+                    // Fallback: open the deep link in a new tab
+                    if (payload.next?.always) {
+                        window.open(payload.next.always, '_blank');
+                    }
+                }
+                
+                // Subscribe to payload updates with QR status updates
                 const result = await this.xumm.payload.subscribe(payload.uuid, (event) => {
                     console.log('📡 Payload update:', event);
+                    
+                    // Update QR modal status based on event
+                    if (typeof window.updateQRStatus === 'function') {
+                        if (event.signed === true) {
+                            window.updateQRStatus('✅ Transaction signed successfully!', 'success');
+                            setTimeout(() => {
+                                window.closeQRModal();
+                            }, 2000);
+                        } else if (event.signed === false) {
+                            window.updateQRStatus('❌ Transaction was rejected or cancelled', 'error');
+                        } else if (event.opened === true) {
+                            window.updateQRStatus('📱 Xaman app opened - please review the transaction', 'info');
+                        }
+                    }
                 });
+                
+                // Close QR modal after subscription completes
+                if (typeof window.closeQRModal === 'function') {
+                    setTimeout(() => {
+                        if (result.signed) {
+                            window.closeQRModal();
+                        }
+                    }, 1000);
+                }
                 
                 return { success: !!result.signed, transaction: result };
             }
@@ -211,6 +254,12 @@ export class WalletConnectorGitHub {
         } catch (error) {
             console.error('❌ Xaman signing error:', error);
             console.error('❌ Error details:', error.response?.data || error.message);
+            
+            // Close QR modal on error
+            if (typeof window.closeQRModal === 'function') {
+                window.closeQRModal();
+            }
+            
             throw new Error(`Xaman signing failed: ${error.message}`);
         }
     }

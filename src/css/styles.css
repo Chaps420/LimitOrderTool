@@ -888,3 +888,177 @@ select.form-control optgroup option {
     color: #ffc107;
     opacity: 0.8;
 }
+
+/* QR Modal Styles */
+.qr-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.qr-modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+}
+
+.qr-modal-content {
+    position: relative;
+    background: #1a1a1a;
+    border-radius: 12px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.qr-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid rgba(255, 193, 7, 0.2);
+}
+
+.qr-modal-header h3 {
+    margin: 0;
+    color: #ffffff;
+    font-size: 1.2rem;
+}
+
+.qr-close-btn {
+    background: none;
+    border: none;
+    color: #cccccc;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.qr-close-btn:hover {
+    background: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+}
+
+.qr-modal-body {
+    padding: 2rem;
+}
+
+.qr-code-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+}
+
+.qr-code-display {
+    background: #ffffff;
+    padding: 1rem;
+    border-radius: 8px;
+    display: inline-block;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.qr-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    min-width: 200px;
+    color: #666;
+}
+
+.qr-loading .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #f0f0f0;
+    border-top: 3px solid #ffc107;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+.qr-instructions {
+    color: #cccccc;
+    margin-bottom: 1rem;
+}
+
+.qr-instructions p {
+    margin-bottom: 0.5rem;
+    color: #ffc107;
+    font-weight: 500;
+}
+
+.qr-instructions ol {
+    margin-left: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.qr-instructions li {
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+}
+
+.qr-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: rgba(255, 193, 7, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    font-weight: 500;
+    color: #ffc107;
+}
+
+.qr-modal-footer {
+    display: flex;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-top: 1px solid rgba(255, 193, 7, 0.2);
+    justify-content: flex-end;
+}
+
+.qr-modal-footer .btn {
+    padding: 0.75rem 1.5rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Mobile Responsive */
+@media (max-width: 600px) {
+    .qr-modal-content {
+        width: 95%;
+        margin: 1rem;
+    }
+    
+    .qr-modal-body {
+        padding: 1.5rem;
+    }
+    
+    .qr-modal-footer {
+        flex-direction: column;
+    }
+    
+    .qr-modal-footer .btn {
+        width: 100%;
+    }
+}
