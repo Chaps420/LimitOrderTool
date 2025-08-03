@@ -186,6 +186,7 @@ export class WalletConnectorFirebase {
     async createXamanPayload(payload) {
         try {
             console.log('📝 Creating Xaman payload via Firebase...');
+            console.log('🔗 Calling URL:', `${this.baseUrl}/xaman/payload`);
             
             const response = await fetch(`${this.baseUrl}/xaman/payload`, {
                 method: 'POST',
