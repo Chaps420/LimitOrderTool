@@ -188,7 +188,7 @@ export class WalletConnectorGitHub {
                 options: {
                     submit: true,
                     multisign: false,
-                    expire: 5
+                    expire: 10 // Increase timeout to 10 minutes
                 }
             });
             
@@ -204,7 +204,7 @@ export class WalletConnectorGitHub {
                     // Use the global function to show QR modal
                     if (typeof window.showQRModal === 'function') {
                         window.showQRModal(payload.refs.qr_png, payload.next?.always);
-                        window.updateQRStatus('Waiting for you to scan and sign...', 'info');
+                        window.updateQRStatus('🔍 QR Code ready! Scan with your phone...', 'info');
                     } else {
                         console.warn('QR modal function not available, opening in new tab as fallback');
                         window.open(payload.next?.always, '_blank');
@@ -225,25 +225,23 @@ export class WalletConnectorGitHub {
                     if (typeof window.updateQRStatus === 'function') {
                         if (event.signed === true) {
                             window.updateQRStatus('✅ Transaction signed successfully!', 'success');
+                            // Don't close modal immediately - let user see success message
                             setTimeout(() => {
                                 window.closeQRModal();
-                            }, 2000);
+                            }, 3000);
                         } else if (event.signed === false) {
                             window.updateQRStatus('❌ Transaction was rejected or cancelled', 'error');
+                            // Close modal after showing error
+                            setTimeout(() => {
+                                window.closeQRModal();
+                            }, 3000);
                         } else if (event.opened === true) {
                             window.updateQRStatus('📱 Xaman app opened - please review the transaction', 'info');
+                        } else if (event.dispatched === true) {
+                            window.updateQRStatus('📡 Transaction dispatched to XRPL network...', 'info');
                         }
                     }
                 });
-                
-                // Close QR modal after subscription completes
-                if (typeof window.closeQRModal === 'function') {
-                    setTimeout(() => {
-                        if (result.signed) {
-                            window.closeQRModal();
-                        }
-                    }, 1000);
-                }
                 
                 return { success: !!result.signed, transaction: result };
             }
@@ -330,28 +328,86 @@ export class WalletConnectorGitHub {
                 success: false,
                 totalRequested: orders.length,
                 totalSigned: 0,
+                signedTransactions: [],
                 transactions: []
             };
 
             // Sign orders one by one using Xaman SDK
             for (let i = 0; i < orders.length; i++) {
                 const order = orders[i];
+                console.log(`📝 Processing order ${i + 1}/${orders.length}:`, order);
                 
                 try {
+                    // Update status for multiple orders
+                    if (typeof window.updateQRStatus === 'function' && orders.length > 1) {
+                        window.updateQRStatus(`📱 Signing order ${i + 1} of ${orders.length}...`, 'info');
+                    }
+                    
                     const signResult = await this.signTransaction(order);
                     
                     if (signResult.success) {
                         results.totalSigned++;
                         results.transactions.push(signResult);
+                        results.signedTransactions.push({
+                            order: i + 1,
+                            transaction: signResult.transaction
+                        });
+                        console.log(`✅ Order ${i + 1} signed successfully`);
+                        
+                        // Update progress for multiple orders
+                        if (typeof window.updateQRStatus === 'function' && orders.length > 1) {
+                            window.updateQRStatus(`✅ Order ${i + 1} completed! (${results.totalSigned}/${orders.length})`, 'success');
+                            
+                            // Brief pause between orders if there are more
+                            if (i < orders.length - 1) {
+                                await new Promise(resolve => setTimeout(resolve, 2000));
+                            }
+                        }
+                    } else {
+                        console.log(`❌ Order ${i + 1} was not signed`);
+                        
+                        // Ask user if they want to continue with remaining orders
+                        if (i < orders.length - 1) {
+                            const continueProcess = confirm(`Order ${i + 1} was not signed. Continue with remaining ${orders.length - i - 1} orders?`);
+                            if (!continueProcess) {
+                                console.log('🛑 User chose to stop processing remaining orders');
+                                break;
+                            }
+                        }
                     }
                     
                 } catch (error) {
                     console.error(`❌ Failed to sign order ${i + 1}:`, error);
-                    // Continue with next order
+                    
+                    // Ask user if they want to continue with remaining orders
+                    if (i < orders.length - 1) {
+                        const continueProcess = confirm(`Order ${i + 1} failed: ${error.message}\n\nContinue with remaining ${orders.length - i - 1} orders?`);
+                        if (!continueProcess) {
+                            console.log('🛑 User chose to stop processing remaining orders');
+                            break;
+                        }
+                    }
                 }
             }
 
             results.success = results.totalSigned > 0;
+            
+            // Final status update
+            if (typeof window.updateQRStatus === 'function') {
+                if (results.totalSigned === orders.length) {
+                    window.updateQRStatus(`🎉 All ${results.totalSigned} orders completed successfully!`, 'success');
+                } else if (results.totalSigned > 0) {
+                    window.updateQRStatus(`⚠️ ${results.totalSigned}/${orders.length} orders completed`, 'info');
+                } else {
+                    window.updateQRStatus(`❌ No orders were completed`, 'error');
+                }
+                
+                // Close modal after final message
+                setTimeout(() => {
+                    window.closeQRModal();
+                }, 4000);
+            }
+            
             return results;
             
         } catch (error) {

@@ -33,7 +33,7 @@
     
     <!-- Suppress browser extension console warnings -->
     <script>
-        // Suppress common browser extension console warnings
+        // Suppress common browser extension console warnings and errors
         const originalConsoleError = console.error;
         const originalConsoleWarn = console.warn;
         
@@ -44,7 +44,14 @@
                 message.includes('ethereum.js') ||
                 message.includes('trusted site') ||
                 message.includes('Pippit') ||
-                message.includes('contentScript')) {
+                message.includes('contentScript') ||
+                message.includes('isolated-script') ||
+                message.includes('NonBackgroundMessenger') ||
+                message.includes('RemoteApiShutdownError') ||
+                message.includes('Receiving end does not exist') ||
+                message.includes('feature-flags') ||
+                message.includes('midnight-wallet') ||
+                message.includes('midnight-authenticator')) {
                 return; // Suppress these specific warnings
             }
             originalConsoleError.apply(console, args);
@@ -57,11 +64,26 @@
                 message.includes('ethereum.js') ||
                 message.includes('trusted site') ||
                 message.includes('Pippit') ||
-                message.includes('contentScript')) {
+                message.includes('contentScript') ||
+                message.includes('isolated-script') ||
+                message.includes('uniswap.org')) {
                 return; // Suppress these specific warnings
             }
             originalConsoleWarn.apply(console, args);
         };
+        
+        // Suppress unhandled promise rejections from browser extensions
+        window.addEventListener('unhandledrejection', function(event) {
+            const message = event.reason?.message || event.reason?.toString() || '';
+            if (message.includes('chrome.runtime') ||
+                message.includes('RemoteApiShutdownError') ||
+                message.includes('feature-flags') ||
+                message.includes('midnight-wallet') ||
+                message.includes('isolated-script')) {
+                event.preventDefault();
+                return;
+            }
+        });
     </script>
 </head>
 <body>
@@ -289,7 +311,7 @@
             const modal = document.getElementById('qrModal');
             const qrDisplay = document.getElementById('qrCodeDisplay');
             
-            // Show modal
+            // Show modal immediately
             modal.style.display = 'flex';
             
             // Clear previous content and show loading
@@ -300,10 +322,25 @@
                 </div>
             `;
             
-            // Generate QR code
+            // Add a longer delay to ensure QR code loads properly
             setTimeout(() => {
-                qrDisplay.innerHTML = `<img src="${qrCodeUrl}" alt="QR Code for Xaman" class="qr-code-image" style="max-width: 256px; width: 100%; height: auto;">`;
-            }, 500);
+                // Create image element with proper loading
+                const img = new Image();
+                img.onload = function() {
+                    qrDisplay.innerHTML = `<img src="${qrCodeUrl}" alt="QR Code for Xaman" class="qr-code-image" style="max-width: 256px; width: 100%; height: auto; border-radius: 8px;">`;
+                    console.log('✅ QR code image loaded successfully');
+                };
+                img.onerror = function() {
+                    qrDisplay.innerHTML = `
+                        <div style="padding: 2rem; text-align: center; color: #dc3545;">
+                            <p>❌ Failed to load QR code</p>
+                            <button onclick="copyXamanLink()" class="btn btn-primary" style="margin-top: 1rem;">📋 Copy Link Instead</button>
+                        </div>
+                    `;
+                    console.error('❌ Failed to load QR code image');
+                };
+                img.src = qrCodeUrl;
+            }, 1000); // Increased delay to 1 second
         };
         
         window.closeQRModal = function() {
