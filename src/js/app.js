@@ -9,6 +9,7 @@ class App {
         
         // Auto-detect standalone mode (no backend available)
         this.standaloneMode = false;
+        this.githubMode = false; // Track GitHub Pages mode
         this.walletConnector = null;
         
         this.orderManager = new OrderManager();
@@ -56,6 +57,7 @@ class App {
                 // Always use GitHub connector for production
                 const { WalletConnectorGitHub } = await import('./wallet-connector-github.js');
                 this.standaloneMode = false;
+                this.githubMode = true; // Set GitHub mode flag
                 this.walletConnector = new WalletConnectorGitHub();
                 this.walletConnector.onConnect = (address) => {
                     this.onWalletConnected(address);
@@ -259,8 +261,8 @@ class App {
             localStorage.removeItem('xrpl-wallet-type');
         }
         
-        // Check backend status (this will be skipped in standalone mode)
-        if (!this.standaloneMode) {
+        // Check backend status (skip for standalone and GitHub modes)
+        if (!this.standaloneMode && !this.githubMode) {
             await this.checkBackendStatus();
         }
     }
