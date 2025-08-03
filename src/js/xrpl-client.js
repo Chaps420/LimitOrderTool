@@ -77,7 +77,6 @@ export class XRPLClient {
                         }
                     }
                 }
-                }
             }
 
             if (!client) {
