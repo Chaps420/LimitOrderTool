@@ -4,10 +4,7 @@ import * as admin from "firebase-admin";
 import * as express from "express";
 import * as cors from "cors";
 import fetch from "node-fetch";
-import * as dotenv from "dotenv";
-
-// Load environment variables from .env file
-dotenv.config();
+import * as functions from "firebase-functions";
 
 // Set global options for 2nd gen functions
 setGlobalOptions({ maxInstances: 10 });
@@ -39,9 +36,10 @@ app.post('/xaman/payload', async (req: any, res: any) => {
   try {
     console.log('Creating Xaman payload:', req.body);
     
-    // For 2nd gen functions, use environment variables instead of functions.config()
-    const xamanApiKey = process.env.XAMAN_API_KEY;
-    const xamanApiSecret = process.env.XAMAN_API_SECRET;
+    // For 2nd gen functions, use functions.config() for now
+    const config = functions.config();
+    const xamanApiKey = config.xaman?.api_key;
+    const xamanApiSecret = config.xaman?.api_secret;
     
     if (!xamanApiKey || !xamanApiSecret) {
       console.log('No Xaman credentials, returning mock payload for development');
@@ -90,8 +88,9 @@ app.get('/xaman/payload/:uuid', async (req: any, res: any) => {
     const { uuid } = req.params;
     console.log('Getting Xaman payload status:', uuid);
     
-    const xamanApiKey = process.env.XAMAN_API_KEY;
-    const xamanApiSecret = process.env.XAMAN_API_SECRET;
+    const config = functions.config();
+    const xamanApiKey = config.xaman?.api_key;
+    const xamanApiSecret = config.xaman?.api_secret;
     
     if (!xamanApiKey || !xamanApiSecret) {
       // Return mock status for development
