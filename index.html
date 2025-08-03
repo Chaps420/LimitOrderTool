@@ -7,8 +7,29 @@
     <link rel="icon" type="image/svg+xml" href="./favicon.svg">
     <link rel="stylesheet" href="./src/css/styles.css">
     
-    <!-- Load XRPL library from CDN -->
-    <script src="https://unpkg.com/xrpl@3.0.0/dist/xrpl-latest-min.js"></script>
+    <!-- Load XRPL library from CDN - using stable version -->
+    <script src="https://unpkg.com/xrpl@2.7.0/dist/xrpl-latest-min.js"></script>
+    
+    <!-- Fallback XRPL library loading -->
+    <script>
+        window.addEventListener('load', function() {
+            if (!window.xrpl) {
+                console.warn('Primary XRPL library failed to load, trying fallback...');
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/xrpl@2.7.0/dist/xrpl-latest-min.js';
+                script.onload = function() {
+                    console.log('✅ XRPL fallback library loaded');
+                };
+                script.onerror = function() {
+                    console.error('❌ Both XRPL libraries failed to load');
+                };
+                document.head.appendChild(script);
+            } else {
+                console.log('✅ XRPL library loaded successfully');
+                console.log('📋 Available XRPL methods:', Object.keys(window.xrpl));
+            }
+        });
+    </script>
     
     <!-- Suppress browser extension console warnings -->
     <script>

@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "firebase:install": "cd functions && npm install",
+    "firebase:build": "cd functions && npm run build",
+    "firebase:serve": "firebase emulators:start",
+    "firebase:deploy": "npm run build && npm run firebase:build && firebase deploy"
   },
   "keywords": ["xrpl", "crypto", "trading", "limit-orders", "xaman"],
   "author": "",

@@ -29,26 +29,59 @@ class App {
         console.log('🔍 Detecting wallet connector mode...');
         
         try {
-            // Try to ping backend
-            console.log('📡 Trying to reach backend at localhost:3002...');
-            const response = await fetch('http://localhost:3002/health', { 
-                method: 'GET',
-                signal: AbortSignal.timeout(3000) // 3 second timeout
-            });
+            // First try Firebase Functions
+            console.log('🔥 Trying Firebase Functions...');
+            const firebaseUrl = this.getFirebaseUrl();
             
-            if (response.ok) {
-                console.log('🔐 Backend detected, using full Xaman integration');
-                const { WalletConnector } = await import('./wallet-connector.js');
-                this.standaloneMode = false;
-                this.walletConnector = new WalletConnector();
-                this.walletConnector.onConnect = (address) => {
-                    this.onWalletConnected(address);
-                };
-                this.updateUIForMode('backend');
-                console.log('✅ Backend mode initialized');
-            } else {
-                throw new Error('Backend not responding');
+            try {
+                const response = await fetch(`${firebaseUrl}/health`, { 
+                    method: 'GET',
+                    signal: AbortSignal.timeout(3000)
+                });
+                
+                if (response.ok) {
+                    console.log('🔥 Firebase Functions detected, using production backend');
+                    const { WalletConnectorFirebase } = await import('./wallet-connector-firebase.js');
+                    this.standaloneMode = false;
+                    this.walletConnector = new WalletConnectorFirebase();
+                    this.walletConnector.onConnect = (address) => {
+                        this.onWalletConnected(address);
+                    };
+                    this.updateUIForMode('firebase');
+                    console.log('✅ Firebase mode initialized');
+                    return;
+                }
+            } catch (firebaseError) {
+                console.log('🔥 Firebase Functions not available:', firebaseError.message);
             }
+            
+            // Fallback: Try local backend
+            console.log('📡 Trying local backend at localhost:3002...');
+            try {
+                const response = await fetch('http://localhost:3002/health', { 
+                    method: 'GET',
+                    signal: AbortSignal.timeout(3000)
+                });
+                
+                if (response.ok) {
+                    console.log('🔐 Local backend detected, using development mode');
+                    const { WalletConnector } = await import('./wallet-connector.js');
+                    this.standaloneMode = false;
+                    this.walletConnector = new WalletConnector();
+                    this.walletConnector.onConnect = (address) => {
+                        this.onWalletConnected(address);
+                    };
+                    this.updateUIForMode('backend');
+                    console.log('✅ Local backend mode initialized');
+                    return;
+                }
+            } catch (backendError) {
+                console.log('📡 Local backend not available:', backendError.message);
+            }
+            
+            // Final fallback: Standalone mode
+            throw new Error('No backend services available');
+            
         } catch (error) {
             console.log('⚡ No backend detected, switching to standalone mode:', error.message);
             
@@ -68,18 +101,39 @@ class App {
         }
     }
 
+    getFirebaseUrl() {
+        // Use the actual Firebase project ID we created
+        const projectId = 'xrpl-limit-order-tool';
+        
+        // For local development, use Firebase emulator
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return `http://localhost:5001/${projectId}/us-central1/api`;
+        }
+        
+        // For production (GitHub Pages), use Firebase Functions URL
+        return `https://us-central1-${projectId}.cloudfunctions.net/api`;
+    }
+
+    extractProjectIdFromHostname(hostname) {
+        // Not needed anymore since we use fixed project ID
+        return 'xrpl-limit-order-tool';
+    }
+
     /**
      * Update UI based on current mode
      */
     updateUIForMode(mode) {
         const statusElement = document.getElementById('backend-status');
         if (statusElement) {
-            if (mode === 'standalone') {
-                statusElement.innerHTML = '<span style="color: #ffc107;">⚡ Standalone Mode (No Backend)</span>';
-                statusElement.title = 'Running without backend server - using client-side integration';
+            if (mode === 'firebase') {
+                statusElement.innerHTML = '<span style="color: #28a745;">🔥 Firebase Production Mode</span>';
+                statusElement.title = 'Connected to Firebase Functions with full Xaman API';
+            } else if (mode === 'backend') {
+                statusElement.innerHTML = '<span style="color: #28a745;">✅ Local Backend Mode</span>';
+                statusElement.title = 'Connected to local backend server with full Xaman API';
             } else {
-                statusElement.innerHTML = '<span style="color: #28a745;">✅ Full Backend Mode</span>';
-                statusElement.title = 'Connected to backend server with full Xaman API';
+                statusElement.innerHTML = '<span style="color: #ffc107;">⚡ Standalone Mode (Limited)</span>';
+                statusElement.title = 'Running without backend server - limited wallet integration';
             }
         }
 

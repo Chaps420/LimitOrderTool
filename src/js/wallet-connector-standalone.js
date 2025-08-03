@@ -219,13 +219,16 @@ export class WalletConnectorStandalone {
                 }
 
                 // Update status
-                document.getElementById('xamanStatus').textContent = 
-                    `Waiting for signature... (${60 - attempts}s remaining)`;
+                const statusElement = document.getElementById('xamanStatus');
+                if (statusElement) {
+                    statusElement.textContent = `Waiting for signature... (${60 - attempts}s remaining)`;
+                }
 
                 // Check for result (in real implementation, this would be an API call)
                 // For production, you would need real Xaman API credentials
                 if (attempts === 10) {
-                    document.getElementById('xamanModal')?.remove();
+                    const modal = document.getElementById('xamanModal');
+                    if (modal) modal.remove();
                     // In production, get real address from Xaman response
                     resolve({
                         signed: true,
@@ -238,7 +241,8 @@ export class WalletConnectorStandalone {
                 setTimeout(poll, 5000);
                 
             } catch (error) {
-                document.getElementById('xamanModal')?.remove();
+                const modal = document.getElementById('xamanModal');
+                if (modal) modal.remove();
                 reject(error);
             }
         };
