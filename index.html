@@ -327,7 +327,7 @@
                 // Create image element with proper loading
                 const img = new Image();
                 img.onload = function() {
-                    qrDisplay.innerHTML = `<img src="${qrCodeUrl}" alt="QR Code for Xaman" class="qr-code-image" style="max-width: 256px; width: 100%; height: auto; border-radius: 8px;">`;
+                    qrDisplay.innerHTML = `<img src="${qrCodeUrl}" alt="QR Code for Xaman" class="qr-code-image">`;
                     console.log('✅ QR code image loaded successfully');
                 };
                 img.onerror = function() {
@@ -340,7 +340,7 @@
                     console.error('❌ Failed to load QR code image');
                 };
                 img.src = qrCodeUrl;
-            }, 1000); // Increased delay to 1 second
+            }, 500); // Reduced delay to 0.5 seconds
         };
         
         window.closeQRModal = function() {
