@@ -267,6 +267,27 @@ class App {
         }
     }
 
+    async ensureXRPLConnection() {
+        console.log('🔗 Ensuring XRPL connection...');
+        
+        // Wait up to 10 seconds for XRPL client to be connected
+        let attempts = 0;
+        const maxAttempts = 100; // 10 seconds with 100ms intervals
+        
+        while (!this.xrplClient.isConnected && attempts < maxAttempts) {
+            console.log(`⏳ Waiting for XRPL connection (attempt ${attempts + 1}/${maxAttempts})...`);
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+        }
+        
+        if (!this.xrplClient.isConnected) {
+            console.error('❌ XRPL connection timeout after 10 seconds');
+            throw new Error('XRPL connection timeout');
+        }
+        
+        console.log('✅ XRPL connection confirmed');
+    }
+
     setupEventListeners() {
         // Wallet connection
         const connectWalletBtn = document.getElementById('connectWallet');
@@ -311,7 +332,10 @@ class App {
         // Sign transaction
         const signTransactionBtn = document.getElementById('signTransaction');
         if (signTransactionBtn) {
-            signTransactionBtn.addEventListener('click', () => {
+            signTransactionBtn.addEventListener('click', (event) => {
+                console.log('🔘 Sign transaction button click event triggered');
+                event.preventDefault();
+                event.stopPropagation();
                 this.signTransaction();
             });
         }
@@ -478,6 +502,10 @@ class App {
         this.updateNetworkStatus('connected', `Wallet Connected: ${address.substring(0, 12)}...`);
         
         console.log('🔄 Loading wallet balance and tokens...');
+        
+        // Wait for XRPL connection before loading balance
+        await this.ensureXRPLConnection();
+        
         // Fetch wallet balance and holdings
         await this.loadWalletBalance();
         
@@ -936,8 +964,16 @@ class App {
             this.pendingTransactions = transactions;
             this.showStatus(`${transactions.length} limit orders prepared. Ready to sign as single batch transaction...`);
             
-            // Enable sign button
-            document.getElementById('signTransaction').disabled = false;
+            // Enable sign button with explicit debugging
+            const signBtn = document.getElementById('signTransaction');
+            if (signBtn) {
+                signBtn.disabled = false;
+                signBtn.style.pointerEvents = 'auto';
+                signBtn.style.opacity = '1';
+                console.log('✅ Sign transaction button enabled and made clickable');
+            } else {
+                console.error('❌ Sign transaction button not found!');
+            }
             
             console.log(`✅ Created ${transactions.length} transactions for batch signing`);
             
@@ -949,7 +985,15 @@ class App {
     async signTransaction() {
         console.log('🔐 Sign transaction button clicked');
         
+        // Add more debugging
+        console.log('📋 Wallet connector status:', {
+            isConnected: this.walletConnector?.isConnected,
+            walletAddress: this.walletAddress,
+            connectorType: this.walletConnector?.constructor?.name
+        });
+        
         if (!this.walletConnector.isConnected) {
+            console.error('❌ Wallet not connected');
             this.showError('Please connect your wallet first');
             return;
         }
