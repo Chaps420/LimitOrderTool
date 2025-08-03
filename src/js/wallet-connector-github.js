@@ -1,6 +1,7 @@
 /**
  * GitHub Pages Wallet Connector
- * Uses Xaman JavaScript SDK for direct browser integration (CORS-friendly)
+ * Uses Xaman JavaScript SDK for session-based integration (CORS-friendly)
+ * Session-only connection - no localStorage persistence
  */
 
 export class WalletConnectorGitHub {
@@ -10,6 +11,7 @@ export class WalletConnectorGitHub {
         this.walletType = null;
         this.onConnect = null;
         this.xumm = null;
+        this.sessionConnected = false; // Session-based connection state
         
         // Xaman API key for SDK initialization
         this.xamanApiKey = '1ee24ba3-7f93-4f63-8ad3-ee605f38eb2d';
@@ -33,28 +35,9 @@ export class WalletConnectorGitHub {
             
             this.xumm = new window.Xumm(this.xamanApiKey);
             
-            // Set up event listeners
+            // Set up event listeners for session-based connection
             this.xumm.on("ready", () => {
-                console.log("✅ Xaman SDK ready");
-            });
-            
-            this.xumm.on("success", async () => {
-                console.log("🎉 Xaman user authenticated");
-                const account = await this.xumm.user.account;
-                if (account) {
-                    this.isConnected = true;
-                    this.walletAddress = account;
-                    this.walletType = 'xaman';
-                    
-                    if (this.onConnect) {
-                        this.onConnect(this.walletAddress);
-                    }
-                }
-            });
-            
-            this.xumm.on("logout", () => {
-                console.log("👋 Xaman user logged out");
-                this.disconnect();
+                console.log("✅ Xaman SDK ready for session-based connection");
             });
             
             this.xumm.on("error", (error) => {
@@ -139,27 +122,98 @@ export class WalletConnectorGitHub {
                 throw new Error('Xaman SDK requires HTTP/HTTPS protocol. Please use a web server.');
             }
             
-            // Use Xaman SDK authorize method - this handles QR codes and mobile redirects automatically
+            // Use SignIn payload for session-based connection
             try {
-                await this.xumm.authorize();
+                console.log('🔐 Creating SignIn payload for session-based connection...');
                 
-                // If we get here, authorization was successful
-                // The SDK will trigger the "success" event and handle account connection
-                return { success: true, address: this.walletAddress };
+                // Create a SignIn payload instead of using authorize()
+                const signInPayload = await this.xumm.payload.create({
+                    TransactionType: 'SignIn'
+                });
                 
-            } catch (authError) {
-                console.error('🚫 Authorization failed:', authError);
+                console.log('📦 SignIn payload created:', signInPayload);
+                
+                if (signInPayload && signInPayload.uuid) {
+                    console.log('✅ SignIn payload created:', signInPayload.uuid);
+                    console.log('🔗 QR Code URL:', signInPayload.refs?.qr_png);
+                    console.log('📱 Xaman Deep Link:', signInPayload.next?.always);
+                    
+                    // Show QR code modal for wallet connection
+                    if (signInPayload.refs?.qr_png) {
+                        if (typeof window.showQRModal === 'function') {
+                            console.log('📱 Showing QR modal for wallet connection...');
+                            window.showQRModal(signInPayload.refs.qr_png, signInPayload.next?.always);
+                        } else {
+                            // Fallback: open Xaman link directly
+                            window.open(signInPayload.next?.always, '_blank');
+                        }
+                    } else {
+                        console.warn('No QR code URL in SignIn payload response');
+                    }
+                    
+                    // Wait for user to scan and sign
+                    console.log('⏳ Waiting for SignIn confirmation...');
+                    const result = await this.xumm.payload.subscribe(signInPayload.uuid);
+                    
+                    console.log('📋 SignIn result:', result);
+                    
+                    if (result && result.signed === true) {
+                        // Get the account from the SignIn result
+                        const account = result.account || result.response?.account;
+                        
+                        if (account) {
+                            console.log('🎉 SignIn successful! Account:', account);
+                            
+                            // Set session-based connection state
+                            this.sessionConnected = true;
+                            this.isConnected = true;
+                            this.walletAddress = account;
+                            this.walletType = 'xaman';
+                            
+                            // Hide QR modal
+                            if (typeof window.hideQRModal === 'function') {
+                                window.hideQRModal();
+                            }
+                            
+                            // Call connection callback
+                            if (this.onConnect) {
+                                this.onConnect(this.walletAddress);
+                            }
+                            
+                            return { 
+                                success: true, 
+                                address: this.walletAddress,
+                                type: this.walletType 
+                            };
+                        } else {
+                            throw new Error('No account found in SignIn response');
+                        }
+                    } else {
+                        throw new Error('SignIn was not completed or was rejected');
+                    }
+                    
+                } else {
+                    throw new Error('Failed to create SignIn payload');
+                }
+                
+            } catch (signInError) {
+                console.error('🚫 SignIn failed:', signInError);
+                
+                // Hide QR modal on error
+                if (typeof window.hideQRModal === 'function') {
+                    window.hideQRModal();
+                }
                 
                 // Provide specific error messages based on common issues
-                if (authError.message && authError.message.includes('redirect')) {
+                if (signInError.message && signInError.message.includes('redirect')) {
                     throw new Error('❌ Redirect URL not configured.\n\nTo fix this:\n1. Go to https://apps.xumm.dev/\n2. Add this URL to your app: ' + window.location.origin);
                 }
                 
-                if (authError.message && authError.message.includes('access_denied')) {
+                if (signInError.message && signInError.message.includes('access_denied')) {
                     throw new Error('❌ Access denied. Please ensure:\n1. Your domain is added to Xaman app settings\n2. The API key is correct\n3. You have proper permissions');
                 }
                 
-                throw authError;
+                throw signInError;
             }
             
         } catch (error) {
@@ -456,13 +510,13 @@ export class WalletConnectorGitHub {
     }
 
     disconnect() {
+        console.log('🔌 Disconnecting session-based wallet connection...');
         this.isConnected = false;
         this.walletAddress = null;
         this.walletType = null;
+        this.sessionConnected = false; // Clear session state
         
-        // Logout from Xaman SDK if available
-        if (this.xumm) {
-            this.xumm.logout();
-        }
+        // No need to logout from Xaman SDK for session-based connection
+        console.log('✅ Session-based wallet disconnected');
     }
 }

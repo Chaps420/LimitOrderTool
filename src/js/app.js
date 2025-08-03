@@ -238,28 +238,9 @@ class App {
         this.updateNetworkStatus('connected', 'Connected to XRPL');
         this.loadPopularTokens();
         
-        // Check for previously connected wallet
-        const savedWalletAddress = localStorage.getItem('xrpl-wallet-address');
-        const savedWalletType = localStorage.getItem('xrpl-wallet-type');
-        
-        if (savedWalletAddress && savedWalletType && savedWalletAddress !== 'null' && this.isValidXRPLAddress(savedWalletAddress)) {
-            console.log('🔄 Found saved wallet, attempting to reconnect:', savedWalletAddress);
-            
-            // Set wallet as connected (user doesn't need to scan QR again)
-            this.walletConnector.walletAddress = savedWalletAddress;
-            this.walletConnector.walletType = savedWalletType;
-            this.walletConnector.isConnected = true;
-            this.walletAddress = savedWalletAddress;
-            
-            // Update UI
-            this.onWalletConnected(savedWalletAddress);
-            
-            console.log('✅ Wallet reconnected automatically');
-        } else if (savedWalletAddress) {
-            console.log('🗑️ Clearing invalid saved wallet data:', savedWalletAddress);
-            localStorage.removeItem('xrpl-wallet-address');
-            localStorage.removeItem('xrpl-wallet-type');
-        }
+        // Session-based connection - no automatic reconnection from localStorage
+        console.log('🔄 Session-based mode - wallet must be connected each session');
+        console.log('💡 No automatic reconnection - user must connect wallet manually');
         
         // Check backend status (skip for standalone and GitHub modes)
         if (!this.standaloneMode && !this.githubMode) {
@@ -458,15 +439,14 @@ class App {
 
         try {
             console.log('🎯 Calling wallet connector...');
-            const address = await this.walletConnector.connect();
-            console.log('✅ Wallet connected with address:', address);
+            const result = await this.walletConnector.connect();
+            console.log('✅ Wallet connected with result:', result);
             
+            const address = result.address || result;
             this.walletAddress = address;
             
-            // Save wallet info to localStorage for persistence
-            localStorage.setItem('xrpl-wallet-address', address);
-            localStorage.setItem('xrpl-wallet-type', this.walletConnector.walletType || 'xaman');
-            console.log('💾 Wallet info saved to localStorage');
+            // Session-based connection - no localStorage persistence
+            console.log('📝 Session-based connection - no persistence to localStorage');
             
             // Update UI
             this.onWalletConnected(address);
@@ -523,10 +503,8 @@ class App {
         // Clear wallet data
         this.walletAddress = null;
         
-        // Clear localStorage
-        localStorage.removeItem('xrpl-wallet-address');
-        localStorage.removeItem('xrpl-wallet-type');
-        console.log('🗑️ Wallet info cleared from localStorage');
+        // Session-based connection - no localStorage to clear
+        console.log('🗑️ Session-based disconnect - no localStorage to clear');
         
         // Update UI
         document.getElementById('connectWallet').style.display = 'block';
