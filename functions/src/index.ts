@@ -4,6 +4,10 @@ import * as admin from "firebase-admin";
 import * as express from "express";
 import * as cors from "cors";
 import fetch from "node-fetch";
+import * as dotenv from "dotenv";
+
+// Load environment variables from .env file
+dotenv.config();
 
 // Set global options for 2nd gen functions
 setGlobalOptions({ maxInstances: 10 });
@@ -40,8 +44,17 @@ app.post('/api/xaman/payload', async (req: any, res: any) => {
     const xamanApiSecret = process.env.XAMAN_API_SECRET;
     
     if (!xamanApiKey || !xamanApiSecret) {
-      return res.status(500).json({ 
-        error: 'Xaman API credentials not configured. Please set XAMAN_API_KEY and XAMAN_API_SECRET environment variables.' 
+      console.log('No Xaman credentials, returning mock payload for development');
+      // Return mock payload for development/testing
+      return res.json({ 
+        uuid: 'mock-' + Date.now(),
+        next: {
+          always: 'https://xumm.app/sign/mock-' + Date.now()
+        },
+        refs: {
+          qr_png: 'https://chart.apis.google.com/chart?cht=qr&chs=300x300&chl=mock-qr-code'
+        },
+        pushed: false
       });
     }
 
@@ -81,6 +94,16 @@ app.get('/api/xaman/payload/:uuid', async (req: any, res: any) => {
     const xamanApiSecret = process.env.XAMAN_API_SECRET;
     
     if (!xamanApiKey || !xamanApiSecret) {
+      // Return mock status for development
+      if (uuid.startsWith('mock-')) {
+        return res.json({
+          meta: {
+            signed: false,
+            resolved: false
+          },
+          response: null
+        });
+      }
       return res.status(500).json({ 
         error: 'Xaman API credentials not configured' 
       });
