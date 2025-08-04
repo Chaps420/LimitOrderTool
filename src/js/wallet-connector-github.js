@@ -309,7 +309,7 @@ export class WalletConnectorGitHub {
                 }
                 
                 // Subscribe to payload updates with QR status updates
-                console.log('🔄 Subscribing to payload updates...');
+                console.log('🔄 [v2.0] Subscribing to payload updates...');
                 
                 // Return a promise that resolves when the transaction is signed or rejected
                 return new Promise((resolve) => {
