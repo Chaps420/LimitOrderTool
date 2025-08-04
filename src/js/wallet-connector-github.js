@@ -80,7 +80,15 @@ export class WalletConnectorGitHub {
             }
         } catch (error) {
             console.error('Xaman connection failed:', error.message);
-            throw new Error(`Xaman wallet connection failed: ${error.message}. Please ensure you have the Xaman app installed and try again.`);
+            
+            // Offer manual fallback
+            console.log('🔄 Offering manual fallback connection...');
+            try {
+                return await this.connectManualFallback();
+            } catch (fallbackError) {
+                console.error('Manual fallback also failed:', fallbackError.message);
+                throw new Error(`Xaman wallet connection failed: ${error.message}. Please ensure you have the Xaman app installed and try again.`);
+            }
         }
 
         throw new Error('Unable to connect to Xaman wallet. Please install the Xaman app and try again.');
@@ -109,11 +117,106 @@ export class WalletConnectorGitHub {
                  window.xaman);
     }
 
+    async diagnosticTest() {
+        console.log('🔬 === STARTING XAMAN SDK DIAGNOSTIC TEST ===');
+        
+        // Test 1: Check if SDK is loaded
+        console.log('Test 1 - SDK loaded:', !!this.xumm);
+        
+        // Test 2: Check SDK methods and structure
+        if (this.xumm) {
+            console.log('Test 2 - SDK methods:', Object.keys(this.xumm));
+            console.log('Test 2a - Has payload:', !!this.xumm.payload);
+            if (this.xumm.payload) {
+                console.log('Test 2b - Payload methods:', Object.keys(this.xumm.payload));
+                console.log('Test 2c - Create method type:', typeof this.xumm.payload.create);
+            }
+            console.log('Test 2d - Has authorize:', typeof this.xumm.authorize);
+            console.log('Test 2e - SDK instance ID:', this.xumm.instance);
+        }
+        
+        // Test 3: Try a simple ping
+        try {
+            console.log('Test 3 - Attempting ping...');
+            if (this.xumm.ping) {
+                const pingResult = await this.xumm.ping();
+                console.log('Test 3 - Ping successful:', pingResult);
+            } else {
+                console.log('Test 3 - No ping method available');
+            }
+        } catch (e) {
+            console.error('Test 3 - Ping failed:', e.message);
+        }
+        
+        // Test 4: Test direct API
+        try {
+            console.log('Test 4 - Testing direct Xaman API...');
+            const response = await fetch('https://xumm.app/api/v1/platform/ping', {
+                method: 'GET',
+                headers: {
+                    'X-API-Key': this.xamanApiKey,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            console.log('Test 4 - API Response status:', response.status);
+            console.log('Test 4 - API Response headers:', Object.fromEntries(response.headers.entries()));
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Test 4 - API Response data:', data);
+            } else {
+                const errorText = await response.text();
+                console.error('Test 4 - API Error:', errorText);
+            }
+        } catch (e) {
+            console.error('Test 4 - Direct API test failed:', e);
+        }
+        
+        // Test 5: Try creating a minimal payload with detailed error catching
+        try {
+            console.log('Test 5 - Creating minimal payload with detailed logging...');
+            
+            // Log the exact payload object before calling create
+            console.log('Test 5a - Payload object:', this.xumm.payload);
+            console.log('Test 5b - Create function:', this.xumm.payload.create.toString().substring(0, 200) + '...');
+            
+            const startTime = Date.now();
+            console.log('Test 5c - Starting payload creation at:', new Date().toISOString());
+            
+            const testPayload = await this.xumm.payload.create({
+                TransactionType: 'SignIn'
+            });
+            
+            const endTime = Date.now();
+            console.log('Test 5d - Payload creation completed in:', endTime - startTime, 'ms');
+            console.log('Test 5e - Payload created successfully:', testPayload);
+            
+        } catch (e) {
+            console.error('Test 5 - Payload creation failed:', e);
+            console.error('Test 5 - Error name:', e.name);
+            console.error('Test 5 - Error message:', e.message);
+            console.error('Test 5 - Error stack:', e.stack);
+            console.error('Test 5 - Error details:', {
+                name: e.name,
+                message: e.message,
+                code: e.code,
+                status: e.status,
+                response: e.response
+            });
+        }
+        
+        console.log('🔬 === DIAGNOSTIC TEST COMPLETE ===');
+    }
+
     async connectWithSignIn() {
         try {
             if (!this.xumm) {
                 throw new Error('Xaman SDK not initialized');
             }
+            
+            // Run diagnostics first
+            await this.diagnosticTest();
             
             console.log('🔐 Creating SignIn payload for session-based connection...');
             console.log('🔍 Xumm object state:', this.xumm);
@@ -517,6 +620,91 @@ export class WalletConnectorGitHub {
         } catch (error) {
             throw new Error(`Crossmark signing failed: ${error.message}`);
         }
+    }
+
+    async connectManualFallback() {
+        console.log('📱 Using manual fallback connection method...');
+        
+        // Create a simple connection URL for Xaman
+        const connectUrl = `https://xumm.app/detect/wallet:${this.xamanApiKey}`;
+        const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(connectUrl)}`;
+        
+        // Show QR modal
+        if (typeof window.showQRModal === 'function') {
+            console.log('📱 Showing manual QR code...');
+            window.showQRModal(qrCodeUrl, connectUrl);
+            
+            // Update modal title to indicate manual mode
+            const modal = document.getElementById('qrModal');
+            if (modal) {
+                const header = modal.querySelector('.qr-modal-header h3');
+                if (header) {
+                    header.textContent = '🔗 Manual Connection - Scan with Xaman App';
+                }
+                
+                // Add manual instructions
+                const instructions = modal.querySelector('.qr-instructions');
+                if (instructions) {
+                    instructions.innerHTML = `
+                        <p>📱 <strong>Manual Connection Mode:</strong></p>
+                        <ol>
+                            <li>Scan the QR code with your Xaman app</li>
+                            <li>Follow the prompts in Xaman to connect</li>
+                            <li>After connecting, enter your wallet address below</li>
+                        </ol>
+                        <div style="margin-top: 1rem;">
+                            <input type="text" id="manualAddress" placeholder="Enter your wallet address (r...)" 
+                                   style="width: 100%; padding: 0.5rem; border: 1px solid #444; background: #2a2a2a; color: white; border-radius: 4px;">
+                            <button onclick="confirmManualConnection()" style="margin-top: 0.5rem; width: 100%; padding: 0.5rem; background: #ffc107; color: #000; border: none; border-radius: 4px; cursor: pointer;">
+                                Confirm Connection
+                            </button>
+                        </div>
+                        <div class="qr-status" id="qrStatus">
+                            Scan QR code, then enter your address above
+                        </div>
+                    `;
+                }
+            }
+        }
+        
+        // Set up global confirmation function
+        window.confirmManualConnection = () => {
+            const addressInput = document.getElementById('manualAddress');
+            const address = addressInput?.value?.trim();
+            
+            if (address && address.startsWith('r') && address.length >= 25) {
+                this.walletAddress = address;
+                this.sessionConnected = true;
+                this.isConnected = true;
+                this.walletType = 'xaman-manual';
+                
+                if (typeof window.closeQRModal === 'function') {
+                    window.closeQRModal();
+                }
+                
+                if (this.onConnect) {
+                    this.onConnect(this.walletAddress);
+                }
+                
+                console.log('✅ Manual connection successful:', address);
+            } else {
+                alert('Please enter a valid XRPL wallet address (starting with "r")');
+            }
+        };
+        
+        // Return a promise that resolves when the user confirms
+        return new Promise((resolve) => {
+            const originalOnConnect = this.onConnect;
+            this.onConnect = (address) => {
+                this.onConnect = originalOnConnect; // Restore original callback
+                if (originalOnConnect) originalOnConnect(address);
+                resolve({
+                    success: true,
+                    address: address,
+                    type: 'xaman-manual'
+                });
+            };
+        });
     }
 
     getWalletAddress() {
