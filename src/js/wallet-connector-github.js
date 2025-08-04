@@ -117,13 +117,22 @@ export class WalletConnectorGitHub {
             
             console.log('🔐 Creating SignIn payload for session-based connection...');
             console.log('🔍 Xumm object state:', this.xumm);
+            console.log('🔍 Payload create method:', typeof this.xumm.payload?.create);
             
-            // Create a SignIn payload with proper error handling
+            // Create a SignIn payload with timeout to prevent hanging
             let signInPayload;
             try {
-                signInPayload = await this.xumm.payload.create({
+                console.log('📦 Attempting SignIn payload creation with timeout...');
+                
+                // Add timeout to prevent hanging
+                const payloadPromise = this.xumm.payload.create({
                     TransactionType: 'SignIn'
                 });
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('SignIn payload timeout after 20 seconds')), 20000)
+                );
+                
+                signInPayload = await Promise.race([payloadPromise, timeoutPromise]);
                 console.log('📦 SignIn payload created successfully:', signInPayload);
             } catch (payloadError) {
                 console.error('❌ Payload creation failed:', payloadError);
