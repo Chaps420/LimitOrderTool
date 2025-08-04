@@ -116,13 +116,51 @@ export class WalletConnectorGitHub {
             }
             
             console.log('🔐 Creating SignIn payload for session-based connection...');
+            console.log('🔍 Xumm object state:', this.xumm);
             
-            // Create a simple SignIn payload
-            const signInPayload = await this.xumm.payload.create({
-                TransactionType: 'SignIn'
-            });
-            
-            console.log('📦 SignIn payload created:', signInPayload);
+            // Create a SignIn payload with proper error handling
+            let signInPayload;
+            try {
+                signInPayload = await this.xumm.payload.create({
+                    TransactionType: 'SignIn'
+                });
+                console.log('📦 SignIn payload created successfully:', signInPayload);
+            } catch (payloadError) {
+                console.error('❌ Payload creation failed:', payloadError);
+                console.error('❌ Error details:', payloadError.message, payloadError.stack);
+                
+                // Try alternative approach - use authorize instead
+                console.log('� Trying alternative authorize method...');
+                try {
+                    const authorizeResult = await this.xumm.authorize();
+                    console.log('�📦 Authorize result:', authorizeResult);
+                    
+                    if (authorizeResult?.me?.account) {
+                        console.log('🎉 Authorization successful! Account:', authorizeResult.me.account);
+                        
+                        // Set connection state
+                        this.sessionConnected = true;
+                        this.isConnected = true;
+                        this.walletAddress = authorizeResult.me.account;
+                        this.walletType = 'xaman';
+                        
+                        // Call connection callback
+                        if (this.onConnect) {
+                            this.onConnect(this.walletAddress);
+                        }
+                        
+                        return { 
+                            success: true, 
+                            address: this.walletAddress,
+                            type: this.walletType 
+                        };
+                    }
+                } catch (authorizeError) {
+                    console.error('❌ Authorize method also failed:', authorizeError);
+                }
+                
+                throw new Error(`Both SignIn payload and authorize failed: ${payloadError.message}`);
+            }
             
             if (signInPayload && signInPayload.uuid) {
                 console.log('✅ SignIn payload created:', signInPayload.uuid);
