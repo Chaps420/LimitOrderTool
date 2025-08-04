@@ -313,8 +313,12 @@ export class WalletConnectorGitHub {
                 
                 // Return a promise that resolves when the transaction is signed or rejected
                 return new Promise((resolve) => {
+                    let resolved = false; // Prevent multiple resolutions
+                    
                     this.xumm.payload.subscribe(payload.uuid, (event) => {
                         console.log('📡 Payload update:', event);
+                        
+                        if (resolved) return; // Prevent multiple resolutions
                         
                         // Update QR modal status based on event
                         if (typeof window.updateQRStatus === 'function') {
@@ -325,7 +329,9 @@ export class WalletConnectorGitHub {
                                     window.closeQRModal();
                                 }, 2000);
                                 // Resolve with success
+                                resolved = true;
                                 resolve({ success: true, transaction: event });
+                                return;
                             } else if (event.signed === false) {
                                 window.updateQRStatus('❌ Transaction was rejected or cancelled', 'error');
                                 // Close modal after showing error
@@ -333,36 +339,38 @@ export class WalletConnectorGitHub {
                                     window.closeQRModal();
                                 }, 2000);
                                 // Resolve with failure
+                                resolved = true;
                                 resolve({ success: false, transaction: event });
+                                return;
                             } else if (event.opened === true) {
                                 window.updateQRStatus('📱 Xaman app opened - please review the transaction', 'info');
                             } else if (event.dispatched === true) {
                                 window.updateQRStatus('📡 Transaction dispatched to XRPL network...', 'info');
                             }
                         }
-                    }).then((result) => {
-                        console.log('📊 Final subscription result:', result);
-                        // This should not be reached due to the event handling above, but keep as fallback
-                        if (!result || result.signed === undefined) {
-                            console.log('🔄 Subscription completed but result unclear, using event result');
-                        }
                     }).catch((error) => {
                         console.error('❌ Subscription error:', error);
-                        window.updateQRStatus('❌ Connection error - please try again', 'error');
-                        setTimeout(() => {
-                            window.closeQRModal();
-                        }, 3000);
-                        resolve({ success: false, error: error.message });
+                        if (!resolved) {
+                            window.updateQRStatus('❌ Connection error - please try again', 'error');
+                            setTimeout(() => {
+                                window.closeQRModal();
+                            }, 3000);
+                            resolved = true;
+                            resolve({ success: false, error: error.message });
+                        }
                     });
                     
                     // Add a timeout fallback in case the subscription never resolves
                     setTimeout(() => {
-                        console.warn('⏰ Transaction timeout - no response received');
-                        window.updateQRStatus('⏰ Transaction timed out - please try again', 'error');
-                        setTimeout(() => {
-                            window.closeQRModal();
-                        }, 3000);
-                        resolve({ success: false, error: 'Transaction timeout' });
+                        if (!resolved) {
+                            console.warn('⏰ Transaction timeout - no response received');
+                            window.updateQRStatus('⏰ Transaction timed out - please try again', 'error');
+                            setTimeout(() => {
+                                window.closeQRModal();
+                            }, 3000);
+                            resolved = true;
+                            resolve({ success: false, error: 'Transaction timeout' });
+                        }
                     }, 300000); // 5 minute timeout
                 });
             }
