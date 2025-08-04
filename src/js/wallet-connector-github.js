@@ -87,16 +87,18 @@ export class WalletConnectorGitHub {
     }
 
     async connectXaman() {
+        console.log('🔐 Starting Xaman connection...');
+        
         try {
-            // Check if Xaman is available in the environment (mobile app)
-            if (!window.ReactNativeWebView && !this.isXamanEnvironment()) {
-                // Use Xaman SDK for web-based connection
-                return await this.connectXamanWeb();
+            if (!this.xumm) {
+                await this.initializeXamanSDK();
             }
             
-            throw new Error('Xaman wallet not detected');
+            // Use session-based SignIn approach
+            return await this.connectWithSignIn();
+            
         } catch (error) {
-            console.error('Xaman connection error:', error);
+            console.error('❌ Xaman connection error:', error);
             throw error;
         }
     }
@@ -107,125 +109,100 @@ export class WalletConnectorGitHub {
                  window.xaman);
     }
 
-    async connectXamanWeb() {
+    async connectWithSignIn() {
         try {
             if (!this.xumm) {
                 throw new Error('Xaman SDK not initialized');
             }
             
-            console.log('🔐 Starting Xaman SDK authorization...');
-            console.log('🌐 Current domain:', window.location.hostname);
-            console.log('📋 Full URL:', window.location.href);
+            console.log('🔐 Creating SignIn payload for session-based connection...');
             
-            // Check if we're in a supported environment
-            if (window.location.protocol === 'file:') {
-                throw new Error('Xaman SDK requires HTTP/HTTPS protocol. Please use a web server.');
-            }
+            // Create a SignIn payload for wallet connection
+            const signInPayload = await this.xumm.payload.create({
+                TransactionType: 'SignIn'
+            });
             
-            // Use SignIn payload for session-based connection
-            try {
-                console.log('🔐 Creating SignIn payload for session-based connection...');
+            console.log('📦 SignIn payload created:', signInPayload);
+            
+            if (signInPayload && signInPayload.uuid) {
+                console.log('✅ SignIn payload created:', signInPayload.uuid);
+                console.log('🔗 QR Code URL:', signInPayload.refs?.qr_png);
+                console.log('📱 Xaman Deep Link:', signInPayload.next?.always);
                 
-                // Create a SignIn payload instead of using authorize()
-                const signInPayload = await this.xumm.payload.create({
-                    TransactionType: 'SignIn'
-                });
-                
-                console.log('📦 SignIn payload created:', signInPayload);
-                
-                if (signInPayload && signInPayload.uuid) {
-                    console.log('✅ SignIn payload created:', signInPayload.uuid);
-                    console.log('🔗 QR Code URL:', signInPayload.refs?.qr_png);
-                    console.log('📱 Xaman Deep Link:', signInPayload.next?.always);
-                    
-                    // Show QR code modal for wallet connection ONLY
-                    if (signInPayload.refs?.qr_png) {
-                        if (typeof window.showQRModal === 'function') {
-                            console.log('📱 Showing QR modal for WALLET CONNECTION only...');
-                            // Update modal title to be clear this is for connection
-                            const modal = document.getElementById('qrModal');
-                            if (modal) {
-                                const header = modal.querySelector('.qr-modal-header h3');
-                                if (header) {
-                                    header.textContent = '🔗 Connect Wallet - Scan with Xaman App';
-                                }
+                // Show QR code modal for wallet connection
+                if (signInPayload.refs?.qr_png) {
+                    if (typeof window.showQRModal === 'function') {
+                        console.log('📱 Showing QR modal for WALLET CONNECTION...');
+                        // Update modal title to be clear this is for connection
+                        const modal = document.getElementById('qrModal');
+                        if (modal) {
+                            const header = modal.querySelector('.qr-modal-header h3');
+                            if (header) {
+                                header.textContent = '🔗 Connect Wallet - Scan with Xaman App';
                             }
-                            window.showQRModal(signInPayload.refs.qr_png, signInPayload.next?.always);
-                        } else {
-                            // Fallback: open Xaman link directly
-                            window.open(signInPayload.next?.always, '_blank');
                         }
+                        window.showQRModal(signInPayload.refs.qr_png, signInPayload.next?.always);
                     } else {
-                        console.warn('No QR code URL in SignIn payload response');
+                        // Fallback: open Xaman link directly
+                        window.open(signInPayload.next?.always, '_blank');
                     }
-                    
-                    // Wait for user to scan and sign
-                    console.log('⏳ Waiting for SignIn confirmation...');
-                    const result = await this.xumm.payload.subscribe(signInPayload.uuid);
-                    
-                    console.log('📋 SignIn result:', result);
-                    
-                    if (result && result.signed === true) {
-                        // Get the account from the SignIn result
-                        const account = result.account || result.response?.account;
-                        
-                        if (account) {
-                            console.log('🎉 SignIn successful! Account:', account);
-                            
-                            // Set session-based connection state
-                            this.sessionConnected = true;
-                            this.isConnected = true;
-                            this.walletAddress = account;
-                            this.walletType = 'xaman';
-                            
-                            // Hide QR modal after successful connection
-                            if (typeof window.closeQRModal === 'function') {
-                                window.closeQRModal();
-                            }
-                            
-                            // Call connection callback
-                            if (this.onConnect) {
-                                this.onConnect(this.walletAddress);
-                            }
-                            
-                            return { 
-                                success: true, 
-                                address: this.walletAddress,
-                                type: this.walletType 
-                            };
-                        } else {
-                            throw new Error('No account found in SignIn response');
-                        }
-                    } else {
-                        throw new Error('SignIn was not completed or was rejected');
-                    }
-                    
                 } else {
-                    throw new Error('Failed to create SignIn payload');
+                    console.warn('No QR code URL in SignIn payload response');
                 }
                 
-            } catch (signInError) {
-                console.error('🚫 SignIn failed:', signInError);
+                // Wait for user to scan and sign
+                console.log('⏳ Waiting for SignIn confirmation...');
+                const result = await this.xumm.payload.subscribe(signInPayload.uuid);
                 
-                // Hide QR modal on error
-                if (typeof window.closeQRModal === 'function') {
-                    window.closeQRModal();
+                console.log('📋 SignIn result:', result);
+                
+                if (result && result.signed === true) {
+                    // Get the account from the SignIn result
+                    const account = result.account || result.response?.account;
+                    
+                    if (account) {
+                        console.log('🎉 SignIn successful! Account:', account);
+                        
+                        // Set session-based connection state
+                        this.sessionConnected = true;
+                        this.isConnected = true;
+                        this.walletAddress = account;
+                        this.walletType = 'xaman';
+                        
+                        // Hide QR modal after successful connection
+                        if (typeof window.closeQRModal === 'function') {
+                            window.closeQRModal();
+                        }
+                        
+                        // Call connection callback
+                        if (this.onConnect) {
+                            this.onConnect(this.walletAddress);
+                        }
+                        
+                        return { 
+                            success: true, 
+                            address: this.walletAddress,
+                            type: this.walletType 
+                        };
+                    } else {
+                        throw new Error('No account found in SignIn response');
+                    }
+                } else {
+                    throw new Error('SignIn was not completed or was rejected');
                 }
                 
-                // Provide specific error messages based on common issues
-                if (signInError.message && signInError.message.includes('redirect')) {
-                    throw new Error('❌ Redirect URL not configured.\n\nTo fix this:\n1. Go to https://apps.xumm.dev/\n2. Add this URL to your app: ' + window.location.origin);
-                }
-                
-                if (signInError.message && signInError.message.includes('access_denied')) {
-                    throw new Error('❌ Access denied. Please ensure:\n1. Your domain is added to Xaman app settings\n2. The API key is correct\n3. You have proper permissions');
-                }
-                
-                throw signInError;
+            } else {
+                throw new Error('Failed to create SignIn payload');
             }
             
         } catch (error) {
-            console.error('Xaman web connection error:', error);
+            console.error('🚫 SignIn connection failed:', error);
+            
+            // Hide QR modal on error
+            if (typeof window.closeQRModal === 'function') {
+                window.closeQRModal();
+            }
+            
             throw error;
         }
     }
