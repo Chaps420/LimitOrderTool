@@ -260,134 +260,101 @@ export class WalletConnectorGitHub {
     }
 
     async signWithXaman(transaction) {
+        if (!this.xumm) throw new Error('Xaman not initialized');
+
         try {
-            if (!this.xumm) {
-                throw new Error('Xaman SDK not initialized');
-            }
+            console.log('Creating payload and subscribing for transaction:', transaction);
             
-            console.log('📝 Creating transaction payload with Xaman SDK...');
-            console.log('📋 Transaction details:', transaction);
-            
-            // Validate transaction has required fields
-            if (!transaction.TransactionType || !transaction.Account) {
-                throw new Error('Invalid transaction format - missing required fields');
-            }
-            
-            // Create payload using Xaman SDK
-            const payload = await this.xumm.payload.create({
+            // Use createAndSubscribe which handles both creation and subscription
+            const { created, resolved } = await this.xumm.payload.createAndSubscribe({
                 txjson: transaction,
                 options: {
                     submit: true,
                     multisign: false,
-                    expire: 10 // Increase timeout to 10 minutes
+                    expire: 10 // 10 minutes timeout
                 }
+            }, (eventMessage) => {
+                console.log('Payload event received:', eventMessage);
+                
+                // Update QR modal status based on event
+                if (typeof window.updateQRStatus === 'function') {
+                    if (Object.keys(eventMessage.data).indexOf('opened') > -1) {
+                        console.log('Payload was opened by user');
+                        window.updateQRStatus('📱 Xaman app opened - please review the transaction', 'info');
+                    }
+                    
+                    if (Object.keys(eventMessage.data).indexOf('dispatched') > -1) {
+                        window.updateQRStatus('� Transaction dispatched to XRPL network...', 'info');
+                    }
+                }
+                
+                // Check if payload was signed/rejected
+                if (Object.keys(eventMessage.data).indexOf('signed') > -1) {
+                    console.log('Payload signed status:', eventMessage.data.signed);
+                    
+                    if (typeof window.updateQRStatus === 'function') {
+                        if (eventMessage.data.signed) {
+                            window.updateQRStatus('✅ Transaction signed successfully!', 'success');
+                        } else {
+                            window.updateQRStatus('❌ Transaction was rejected or cancelled', 'error');
+                        }
+                    }
+                    
+                    return eventMessage; // This resolves the subscription
+                }
+                
+                // Don't return anything for other events to keep subscription active
             });
+
+            console.log('Payload created:', created);
+            console.log('Payload URL:', created.next.always);
+            console.log('Payload QR:', created.refs.qr_png);
             
-            console.log('📦 Payload creation response:', payload);
-            
-            if (payload && payload.uuid) {
-                console.log('✅ Payload created:', payload.uuid);
-                console.log('🔗 QR Code URL:', payload.refs?.qr_png);
-                console.log('📱 Xaman Deep Link:', payload.next?.always);
-                
-                // Show QR code modal with the generated QR code
-                if (payload.refs?.qr_png) {
-                    // Use the global function to show QR modal
-                    if (typeof window.showQRModal === 'function') {
-                        window.showQRModal(payload.refs.qr_png, payload.next?.always);
-                        window.updateQRStatus('🔍 QR Code ready! Scan with your phone...', 'info');
-                    } else {
-                        console.warn('QR modal function not available, opening in new tab as fallback');
-                        window.open(payload.next?.always, '_blank');
-                    }
+            // Display QR code using global function
+            if (created?.refs?.qr_png) {
+                if (typeof window.showQRModal === 'function') {
+                    window.showQRModal(created.refs.qr_png, created.next?.always);
+                    window.updateQRStatus('🔍 QR Code ready! Scan with your phone...', 'info');
                 } else {
-                    console.warn('No QR code URL in payload response');
-                    // Fallback: open the deep link in a new tab
-                    if (payload.next?.always) {
-                        window.open(payload.next.always, '_blank');
-                    }
+                    console.warn('QR modal function not available, opening in new tab as fallback');
+                    window.open(created.next?.always, '_blank');
                 }
-                
-                // Subscribe to payload updates with QR status updates
-                console.log('🔄 [v2.0] Subscribing to payload updates...');
-                
-                // Return a promise that resolves when the transaction is signed or rejected
-                return new Promise((resolve) => {
-                    let resolved = false; // Prevent multiple resolutions
-                    
-                    this.xumm.payload.subscribe(payload.uuid, (event) => {
-                        console.log('📡 Payload update:', event);
-                        
-                        if (resolved) return; // Prevent multiple resolutions
-                        
-                        // Update QR modal status based on event
-                        if (typeof window.updateQRStatus === 'function') {
-                            if (event.signed === true) {
-                                window.updateQRStatus('✅ Transaction signed successfully!', 'success');
-                                // Don't close modal immediately - let user see success message
-                                setTimeout(() => {
-                                    window.closeQRModal();
-                                }, 2000);
-                                // Resolve with success
-                                resolved = true;
-                                resolve({ success: true, transaction: event });
-                                return;
-                            } else if (event.signed === false) {
-                                window.updateQRStatus('❌ Transaction was rejected or cancelled', 'error');
-                                // Close modal after showing error
-                                setTimeout(() => {
-                                    window.closeQRModal();
-                                }, 2000);
-                                // Resolve with failure
-                                resolved = true;
-                                resolve({ success: false, transaction: event });
-                                return;
-                            } else if (event.opened === true) {
-                                window.updateQRStatus('📱 Xaman app opened - please review the transaction', 'info');
-                            } else if (event.dispatched === true) {
-                                window.updateQRStatus('📡 Transaction dispatched to XRPL network...', 'info');
-                            }
-                        }
-                    }).catch((error) => {
-                        console.error('❌ Subscription error:', error);
-                        if (!resolved) {
-                            window.updateQRStatus('❌ Connection error - please try again', 'error');
-                            setTimeout(() => {
-                                window.closeQRModal();
-                            }, 3000);
-                            resolved = true;
-                            resolve({ success: false, error: error.message });
-                        }
-                    });
-                    
-                    // Add a timeout fallback in case the subscription never resolves
-                    setTimeout(() => {
-                        if (!resolved) {
-                            console.warn('⏰ Transaction timeout - no response received');
-                            window.updateQRStatus('⏰ Transaction timed out - please try again', 'error');
-                            setTimeout(() => {
-                                window.closeQRModal();
-                            }, 3000);
-                            resolved = true;
-                            resolve({ success: false, error: 'Transaction timeout' });
-                        }
-                    }, 300000); // 5 minute timeout
-                });
+            } else {
+                console.error('No QR code data in payload response');
             }
+
+            console.log('Waiting for payload resolution...');
             
-            console.error('❌ Payload creation failed - no UUID returned');
-            throw new Error('Failed to create transaction payload - no UUID returned');
+            // Wait for the subscription to resolve
+            const result = await resolved;
             
+            console.log('Payload resolved with result:', result);
+            
+            // Close QR modal after a brief delay to show final status
+            setTimeout(() => {
+                if (typeof window.closeQRModal === 'function') {
+                    window.closeQRModal();
+                }
+            }, 2000);
+            
+            // Check if transaction was signed
+            if (result?.data?.signed) {
+                console.log('Transaction signed successfully');
+                return { success: true, transaction: result.data };
+            } else {
+                console.log('Transaction rejected by user');
+                return { success: false, transaction: result.data };
+            }
+
         } catch (error) {
-            console.error('❌ Xaman signing error:', error);
-            console.error('❌ Error details:', error.response?.data || error.message);
+            console.error('Error in signWithXaman:', error);
             
             // Close QR modal on error
             if (typeof window.closeQRModal === 'function') {
                 window.closeQRModal();
             }
             
-            throw new Error(`Xaman signing failed: ${error.message}`);
+            throw error;
         }
     }
 
