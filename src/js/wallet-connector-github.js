@@ -116,62 +116,31 @@ export class WalletConnectorGitHub {
             }
             
             console.log('🔐 Creating SignIn payload for session-based connection...');
-            console.log('🔍 Xaman SDK state:', { 
-                xumm: !!this.xumm, 
-                runtime: this.xumm?.runtime,
-                methods: this.xumm ? Object.keys(this.xumm) : []
+            
+            // Create a simple SignIn payload
+            const signInPayload = await this.xumm.payload.create({
+                TransactionType: 'SignIn'
             });
             
-            // Create a SignIn payload for wallet connection
-            let signInPayload;
-            try {
-                signInPayload = await this.xumm.payload.create({
-                    TransactionType: 'SignIn'
-                });
-                console.log('📦 SignIn payload created successfully:', signInPayload);
-            } catch (payloadError) {
-                console.error('❌ Payload creation failed:', payloadError);
-                throw new Error(`Failed to create SignIn payload: ${payloadError.message}`);
-            }
+            console.log('📦 SignIn payload created:', signInPayload);
             
             if (signInPayload && signInPayload.uuid) {
                 console.log('✅ SignIn payload created:', signInPayload.uuid);
                 console.log('🔗 QR Code URL:', signInPayload.refs?.qr_png);
-                console.log('📱 Xaman Deep Link:', signInPayload.next?.always);
                 
                 // Show QR code modal for wallet connection
                 if (signInPayload.refs?.qr_png) {
-                    if (typeof window.showQRModal === 'function') {
-                        console.log('📱 Showing QR modal for WALLET CONNECTION...');
-                        // Update modal title to be clear this is for connection
-                        const modal = document.getElementById('qrModal');
-                        if (modal) {
-                            const header = modal.querySelector('.qr-modal-header h3');
-                            if (header) {
-                                header.textContent = '🔗 Connect Wallet - Scan with Xaman App';
-                            }
-                        }
-                        window.showQRModal(signInPayload.refs.qr_png, signInPayload.next?.always);
-                    } else {
-                        console.warn('showQRModal function not available, using fallback');
-                        // Fallback: open Xaman link directly
-                        window.open(signInPayload.next?.always, '_blank');
-                    }
+                    console.log('📱 Showing QR modal for WALLET CONNECTION...');
+                    window.showQRModal(signInPayload.refs.qr_png, signInPayload.next?.always);
                 } else {
                     console.warn('No QR code URL in SignIn payload response');
-                    console.log('📋 Full payload structure:', signInPayload);
                 }
                 
                 // Wait for user to scan and sign
                 console.log('⏳ Waiting for SignIn confirmation...');
-                let result;
-                try {
-                    result = await this.xumm.payload.subscribe(signInPayload.uuid);
-                    console.log('📋 SignIn result received:', result);
-                } catch (subscribeError) {
-                    console.error('❌ Payload subscription failed:', subscribeError);
-                    throw new Error(`Failed to subscribe to payload: ${subscribeError.message}`);
-                }
+                const result = await this.xumm.payload.subscribe(signInPayload.uuid);
+                
+                console.log('📋 SignIn result:', result);
                 
                 if (result && result.signed === true) {
                     // Get the account from the SignIn result
@@ -209,16 +178,11 @@ export class WalletConnectorGitHub {
                 }
                 
             } else {
-                throw new Error('Failed to create SignIn payload - no UUID returned');
+                throw new Error('Failed to create SignIn payload');
             }
             
         } catch (error) {
             console.error('🚫 SignIn connection failed:', error);
-            console.error('🔍 Error details:', {
-                message: error.message,
-                stack: error.stack,
-                name: error.name
-            });
             
             // Hide QR modal on error
             if (typeof window.closeQRModal === 'function') {
