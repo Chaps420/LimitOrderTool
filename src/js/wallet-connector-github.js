@@ -218,121 +218,39 @@ export class WalletConnectorGitHub {
             // Run diagnostics first
             await this.diagnosticTest();
             
-            console.log('🔐 Creating SignIn payload for session-based connection...');
+            console.log('🔐 Using authorize method (payload system broken)...');
             console.log('🔍 Xumm object state:', this.xumm);
-            console.log('🔍 Payload create method:', typeof this.xumm.payload?.create);
+            console.log('🔍 Skipping broken payload.create - using authorize directly');
             
-            // Create a SignIn payload with timeout to prevent hanging
-            let signInPayload;
-            try {
-                console.log('📦 Attempting SignIn payload creation with timeout...');
-                
-                // Add timeout to prevent hanging
-                const payloadPromise = this.xumm.payload.create({
-                    TransactionType: 'SignIn'
-                });
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('SignIn payload timeout after 20 seconds')), 20000)
-                );
-                
-                signInPayload = await Promise.race([payloadPromise, timeoutPromise]);
-                console.log('📦 SignIn payload created successfully:', signInPayload);
-            } catch (payloadError) {
-                console.error('❌ Payload creation failed:', payloadError);
-                console.error('❌ Error details:', payloadError.message, payloadError.stack);
-                
-                // Try alternative approach - use authorize instead
-                console.log('� Trying alternative authorize method...');
-                try {
-                    const authorizeResult = await this.xumm.authorize();
-                    console.log('�📦 Authorize result:', authorizeResult);
-                    
-                    if (authorizeResult?.me?.account) {
-                        console.log('🎉 Authorization successful! Account:', authorizeResult.me.account);
-                        
-                        // Set connection state
-                        this.sessionConnected = true;
-                        this.isConnected = true;
-                        this.walletAddress = authorizeResult.me.account;
-                        this.walletType = 'xaman';
-                        
-                        // Call connection callback
-                        if (this.onConnect) {
-                            this.onConnect(this.walletAddress);
-                        }
-                        
-                        return { 
-                            success: true, 
-                            address: this.walletAddress,
-                            type: this.walletType 
-                        };
-                    }
-                } catch (authorizeError) {
-                    console.error('❌ Authorize method also failed:', authorizeError);
-                }
-                
-                throw new Error(`Both SignIn payload and authorize failed: ${payloadError.message}`);
-            }
+            // Use authorize method directly since payload.create is broken
+            const authorizeResult = await this.xumm.authorize();
+            console.log('📦 Authorize result:', authorizeResult);
             
-            if (signInPayload && signInPayload.uuid) {
-                console.log('✅ SignIn payload created:', signInPayload.uuid);
-                console.log('🔗 QR Code URL:', signInPayload.refs?.qr_png);
+            if (authorizeResult?.me?.account) {
+                console.log('🎉 Authorization successful! Account:', authorizeResult.me.account);
                 
-                // Show QR code modal for wallet connection
-                if (signInPayload.refs?.qr_png) {
-                    console.log('📱 Showing QR modal for WALLET CONNECTION...');
-                    window.showQRModal(signInPayload.refs.qr_png, signInPayload.next?.always);
-                } else {
-                    console.warn('No QR code URL in SignIn payload response');
+                // Set session-based connection state
+                this.sessionConnected = true;
+                this.isConnected = true;
+                this.walletAddress = authorizeResult.me.account;
+                this.walletType = 'xaman';
+                
+                // Call connection callback
+                if (this.onConnect) {
+                    this.onConnect(this.walletAddress);
                 }
                 
-                // Wait for user to scan and sign
-                console.log('⏳ Waiting for SignIn confirmation...');
-                const result = await this.xumm.payload.subscribe(signInPayload.uuid);
-                
-                console.log('📋 SignIn result:', result);
-                
-                if (result && result.signed === true) {
-                    // Get the account from the SignIn result
-                    const account = result.account || result.response?.account;
-                    
-                    if (account) {
-                        console.log('🎉 SignIn successful! Account:', account);
-                        
-                        // Set session-based connection state
-                        this.sessionConnected = true;
-                        this.isConnected = true;
-                        this.walletAddress = account;
-                        this.walletType = 'xaman';
-                        
-                        // Hide QR modal after successful connection
-                        if (typeof window.closeQRModal === 'function') {
-                            window.closeQRModal();
-                        }
-                        
-                        // Call connection callback
-                        if (this.onConnect) {
-                            this.onConnect(this.walletAddress);
-                        }
-                        
-                        return { 
-                            success: true, 
-                            address: this.walletAddress,
-                            type: this.walletType 
-                        };
-                    } else {
-                        throw new Error('No account found in SignIn response');
-                    }
-                } else {
-                    throw new Error('SignIn was not completed or was rejected');
-                }
-                
+                return { 
+                    success: true, 
+                    address: this.walletAddress,
+                    type: this.walletType 
+                };
             } else {
-                throw new Error('Failed to create SignIn payload');
+                throw new Error('No account found in authorize response');
             }
             
         } catch (error) {
-            console.error('🚫 SignIn connection failed:', error);
+            console.error('� Connection failed:', error);
             
             // Hide QR modal on error
             if (typeof window.closeQRModal === 'function') {
