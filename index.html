@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XRPL Limit Order Tool [v2.2] - Batch Order Creation</title>
+    <title>XRPL Limit Order Tool [v2.3] - Batch Order Creation</title>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg">
     <link rel="stylesheet" href="./src/css/styles.css">
     
@@ -319,9 +319,27 @@
             const modal = document.getElementById('qrModal');
             const qrDisplay = document.getElementById('qrCodeDisplay');
             
-            // Show modal immediately
-            modal.style.setProperty('display', 'flex', 'important');
-            modal.style.setProperty('visibility', 'visible', 'important');
+            // Force remove any conflicting styles first
+            modal.style.removeProperty('display');
+            modal.style.removeProperty('visibility');
+            
+            // Use requestAnimationFrame to ensure DOM updates
+            requestAnimationFrame(() => {
+                // Show modal with maximum priority using cssText
+                modal.style.cssText = 'display: flex !important; visibility: visible !important; opacity: 1 !important; pointer-events: auto !important; z-index: 99999 !important;';
+                
+                // Also ensure the modal is not hidden by parent elements
+                document.body.style.overflow = 'hidden'; // Prevent background scrolling
+                
+                console.log('🔍 Modal display after setting:', window.getComputedStyle(modal).display);
+                console.log('🔍 Modal visibility after setting:', window.getComputedStyle(modal).visibility);
+                console.log('🔍 Modal computed styles:', {
+                    display: window.getComputedStyle(modal).display,
+                    visibility: window.getComputedStyle(modal).visibility,
+                    opacity: window.getComputedStyle(modal).opacity,
+                    zIndex: window.getComputedStyle(modal).zIndex
+                });
+            });
             
             // Clear previous content and show loading
             qrDisplay.innerHTML = `
@@ -354,8 +372,8 @@
         
         window.closeQRModal = function() {
             const modal = document.getElementById('qrModal');
-            modal.style.setProperty('display', 'none', 'important');
-            modal.style.setProperty('visibility', 'hidden', 'important');
+            modal.style.cssText = 'display: none !important; visibility: hidden !important;';
+            document.body.style.overflow = ''; // Restore scrolling
             currentXamanLink = '';
         };
         
@@ -408,6 +426,43 @@
             }
         });
         
+        // Add diagnostic function
+        window.debugQRModal = function() {
+            const modal = document.getElementById('qrModal');
+            console.log('🔍 QR Modal Debug Info:');
+            console.log('Element exists:', !!modal);
+            if (modal) {
+                console.log('Inline styles:', modal.style.cssText);
+                console.log('Computed styles:', {
+                    display: window.getComputedStyle(modal).display,
+                    visibility: window.getComputedStyle(modal).visibility,
+                    opacity: window.getComputedStyle(modal).opacity,
+                    position: window.getComputedStyle(modal).position,
+                    zIndex: window.getComputedStyle(modal).zIndex,
+                    width: window.getComputedStyle(modal).width,
+                    height: window.getComputedStyle(modal).height
+                });
+                console.log('Parent element:', modal.parentElement);
+                console.log('Modal HTML:', modal.outerHTML.substring(0, 200) + '...');
+                
+                // Check all stylesheets for rules affecting the modal
+                const sheets = document.styleSheets;
+                console.log('Checking stylesheets for #qrModal rules...');
+                for (let i = 0; i < sheets.length; i++) {
+                    try {
+                        const rules = sheets[i].cssRules || sheets[i].rules;
+                        for (let j = 0; j < rules.length; j++) {
+                            if (rules[j].selectorText && rules[j].selectorText.includes('qrModal')) {
+                                console.log('Found CSS rule:', rules[j].cssText);
+                            }
+                        }
+                    } catch (e) {
+                        // Skip cross-origin stylesheets
+                    }
+                }
+            }
+        };
+        
         // Wait for XRPL library to load before initializing the app
         async function waitForXRPL() {
             let attempts = 0;
@@ -438,10 +493,12 @@
             const modal = document.getElementById('qrModal');
             if (modal) {
                 console.log('🔍 QR modal display style:', window.getComputedStyle(modal).display);
-                // Force hide the modal
-                modal.style.setProperty('display', 'none', 'important');
-                modal.style.setProperty('visibility', 'hidden', 'important');
+                // Force hide the modal using cssText
+                modal.style.cssText = 'display: none !important; visibility: hidden !important;';
                 console.log('🔒 QR modal forcibly hidden on page load');
+                
+                // Add debug button for testing (remove in production)
+                console.log('💡 Type debugQRModal() in console to diagnose QR modal issues');
             }
         });
     </script>
