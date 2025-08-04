@@ -1216,6 +1216,12 @@ class App {
         const statusSection = document.getElementById('statusSection');
         const statusDisplay = document.getElementById('statusDisplay');
         
+        // If this is a success or error message, clear previous pending messages
+        if (type === 'success' || type === 'error') {
+            const pendingItems = statusDisplay.querySelectorAll('.status-item.pending');
+            pendingItems.forEach(item => item.remove());
+        }
+        
         const statusItem = document.createElement('div');
         statusItem.className = `status-item ${type}`;
         statusItem.innerHTML = `
@@ -1230,6 +1236,18 @@ class App {
 
     showError(message) {
         this.showStatus(message, 'error');
+    }
+
+    clearStatus() {
+        const statusSection = document.getElementById('statusSection');
+        const statusDisplay = document.getElementById('statusDisplay');
+        
+        if (statusDisplay) {
+            statusDisplay.innerHTML = '';
+        }
+        if (statusSection) {
+            statusSection.style.display = 'none';
+        }
     }
 
     updateTransactionStatus(message, type = 'info') {
@@ -1261,6 +1279,7 @@ class App {
         
         // Hide sections
         this.hidePreview();
+        this.clearStatus(); // Clear transaction status
         
         // Reset orders
         this.orders = [];
