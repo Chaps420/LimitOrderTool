@@ -215,12 +215,10 @@ export class WalletConnectorGitHub {
                 throw new Error('Xaman SDK not initialized');
             }
             
-            // Run diagnostics first
-            await this.diagnosticTest();
-            
-            console.log('🔐 Using authorize method (payload system broken)...');
-            console.log('🔍 Xumm object state:', this.xumm);
-            console.log('🔍 Skipping broken payload.create - using authorize directly');
+            // Skip problematic diagnostics - go straight to authorize
+            console.log('🔐 Using authorize method directly...');
+            console.log('🔍 SDK loaded:', !!this.xumm);
+            console.log('🔍 Authorize method available:', typeof this.xumm.authorize);
             
             // Use authorize method directly since payload.create is broken
             const authorizeResult = await this.xumm.authorize();
