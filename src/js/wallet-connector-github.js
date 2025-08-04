@@ -310,48 +310,61 @@ export class WalletConnectorGitHub {
                 
                 // Subscribe to payload updates with QR status updates
                 console.log('🔄 Subscribing to payload updates...');
-                const result = await this.xumm.payload.subscribe(payload.uuid, (event) => {
-                    console.log('📡 Payload update:', event);
-                    
-                    // Update QR modal status based on event
-                    if (typeof window.updateQRStatus === 'function') {
-                        if (event.signed === true) {
-                            window.updateQRStatus('✅ Transaction signed successfully!', 'success');
-                            // Don't close modal immediately - let user see success message
-                            setTimeout(() => {
-                                window.closeQRModal();
-                            }, 2000);
-                        } else if (event.signed === false) {
-                            window.updateQRStatus('❌ Transaction was rejected or cancelled', 'error');
-                        } else if (event.opened === true) {
-                            window.updateQRStatus('📱 Xaman app opened - please review the transaction', 'info');
-                        } else if (event.dispatched === true) {
-                            window.updateQRStatus('📡 Transaction dispatched to XRPL network...', 'info');
-                        }
-                    }
-                });
                 
-                console.log('📊 Payload subscription result:', result);
-                console.log('📊 Result.signed:', result?.signed);
-                console.log('📊 Result details:', result);
-                
-                // If subscription failed, try to get payload status directly
-                if (!result || result.signed === undefined) {
-                    console.log('🔄 Subscription result unclear, checking payload status directly...');
-                    try {
-                        const payloadStatus = await this.xumm.payload.get(payload.uuid);
-                        console.log('📊 Direct payload status:', payloadStatus);
+                // Return a promise that resolves when the transaction is signed or rejected
+                return new Promise((resolve) => {
+                    this.xumm.payload.subscribe(payload.uuid, (event) => {
+                        console.log('📡 Payload update:', event);
                         
-                        if (payloadStatus && payloadStatus.meta && payloadStatus.meta.signed === true) {
-                            console.log('✅ Direct check confirms transaction was signed');
-                            return { success: true, transaction: payloadStatus };
+                        // Update QR modal status based on event
+                        if (typeof window.updateQRStatus === 'function') {
+                            if (event.signed === true) {
+                                window.updateQRStatus('✅ Transaction signed successfully!', 'success');
+                                // Don't close modal immediately - let user see success message
+                                setTimeout(() => {
+                                    window.closeQRModal();
+                                }, 2000);
+                                // Resolve with success
+                                resolve({ success: true, transaction: event });
+                            } else if (event.signed === false) {
+                                window.updateQRStatus('❌ Transaction was rejected or cancelled', 'error');
+                                // Close modal after showing error
+                                setTimeout(() => {
+                                    window.closeQRModal();
+                                }, 2000);
+                                // Resolve with failure
+                                resolve({ success: false, transaction: event });
+                            } else if (event.opened === true) {
+                                window.updateQRStatus('📱 Xaman app opened - please review the transaction', 'info');
+                            } else if (event.dispatched === true) {
+                                window.updateQRStatus('📡 Transaction dispatched to XRPL network...', 'info');
+                            }
                         }
-                    } catch (statusError) {
-                        console.error('❌ Failed to get direct payload status:', statusError);
-                    }
-                }
-                
-                return { success: !!result?.signed, transaction: result };
+                    }).then((result) => {
+                        console.log('📊 Final subscription result:', result);
+                        // This should not be reached due to the event handling above, but keep as fallback
+                        if (!result || result.signed === undefined) {
+                            console.log('🔄 Subscription completed but result unclear, using event result');
+                        }
+                    }).catch((error) => {
+                        console.error('❌ Subscription error:', error);
+                        window.updateQRStatus('❌ Connection error - please try again', 'error');
+                        setTimeout(() => {
+                            window.closeQRModal();
+                        }, 3000);
+                        resolve({ success: false, error: error.message });
+                    });
+                    
+                    // Add a timeout fallback in case the subscription never resolves
+                    setTimeout(() => {
+                        console.warn('⏰ Transaction timeout - no response received');
+                        window.updateQRStatus('⏰ Transaction timed out - please try again', 'error');
+                        setTimeout(() => {
+                            window.closeQRModal();
+                        }, 3000);
+                        resolve({ success: false, error: 'Transaction timeout' });
+                    }, 300000); // 5 minute timeout
+                });
             }
             
             console.error('❌ Payload creation failed - no UUID returned');
