@@ -495,6 +495,9 @@ class App {
     }
 
     disconnectWallet() {
+        // Show disconnecting status
+        this.showStatus('Disconnecting wallet...', 'warning');
+        
         // Disconnect from wallet connector
         if (this.walletConnector) {
             this.walletConnector.disconnect();
@@ -504,7 +507,7 @@ class App {
         this.walletAddress = null;
         
         // Session-based connection - no localStorage to clear
-        console.log('🗑️ Session-based disconnect - no localStorage to clear');
+        console.log('🗑️ Session-based disconnect - clearing Xaman SDK session');
         
         // Update UI
         document.getElementById('connectWallet').style.display = 'block';
@@ -518,6 +521,11 @@ class App {
         
         // Clear any existing orders
         this.orders = [];
+        
+        // Show completion message with additional info
+        setTimeout(() => {
+            this.showStatus('Wallet disconnected. Note: For complete logout, you may need to refresh the page.', 'success');
+        }, 500);
         this.updateOrdersDisplay();
         
         console.log('🔌 Wallet disconnected successfully');

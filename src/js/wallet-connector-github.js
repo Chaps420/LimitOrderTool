@@ -654,7 +654,65 @@ export class WalletConnectorGitHub {
         this.walletType = null;
         this.sessionConnected = false; // Clear session state
         
-        // No need to logout from Xaman SDK for session-based connection
+        // Try to clear Xaman SDK session if possible
+        if (this.xumm) {
+            try {
+                // Check if SDK has logout/clearAuth methods
+                if (typeof this.xumm.logout === 'function') {
+                    console.log('🔐 Calling Xaman SDK logout...');
+                    this.xumm.logout();
+                } else if (typeof this.xumm.clearAuth === 'function') {
+                    console.log('🔐 Calling Xaman SDK clearAuth...');
+                    this.xumm.clearAuth();
+                } else {
+                    console.log('⚠️ No SDK logout method found - authorization may persist');
+                    
+                    // Try to reinitialize the SDK to clear session
+                    console.log('🔄 Reinitializing Xaman SDK to clear session...');
+                    this.xumm = null;
+                    // Don't await this as it's a cleanup operation
+                    this.initializeXamanSDK().catch(err => {
+                        console.warn('SDK reinitialization failed:', err);
+                    });
+                }
+            } catch (error) {
+                console.warn('Error during SDK cleanup:', error);
+            }
+        }
+        
+        // Clear any browser storage that might contain Xaman session data
+        try {
+            // Clear localStorage items that might contain Xaman data
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.includes('xumm') || key.includes('xaman') || key.includes('jwt'))) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => {
+                console.log('🗑️ Clearing localStorage key:', key);
+                localStorage.removeItem(key);
+            });
+            
+            // Clear sessionStorage items that might contain Xaman data  
+            const sessionKeysToRemove = [];
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key && (key.includes('xumm') || key.includes('xaman') || key.includes('jwt'))) {
+                    sessionKeysToRemove.push(key);
+                }
+            }
+            sessionKeysToRemove.forEach(key => {
+                console.log('🗑️ Clearing sessionStorage key:', key);
+                sessionStorage.removeItem(key);
+            });
+            
+        } catch (error) {
+            console.warn('Error clearing browser storage:', error);
+        }
+        
         console.log('✅ Session-based wallet disconnected');
+        console.log('💡 Note: Complete logout may require page refresh due to Xaman SDK session persistence');
     }
 }

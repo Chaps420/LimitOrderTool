@@ -499,8 +499,46 @@
                 
                 // Add debug button for testing (remove in production)
                 console.log('💡 Type debugQRModal() in console to diagnose QR modal issues');
+                console.log('💡 Type debugStorage() in console to check storage state');
             }
         });
+        
+        // Storage debugging function
+        window.debugStorage = function() {
+            console.log('🔍 Storage Debug Report:');
+            
+            // Check localStorage
+            console.log('📦 localStorage items:');
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                console.log(`  ${key}: ${localStorage.getItem(key)}`);
+            }
+            if (localStorage.length === 0) {
+                console.log('  (empty)');
+            }
+            
+            // Check sessionStorage
+            console.log('📦 sessionStorage items:');
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                console.log(`  ${key}: ${sessionStorage.getItem(key)}`);
+            }
+            if (sessionStorage.length === 0) {
+                console.log('  (empty)');
+            }
+            
+            // Check for Xaman SDK state
+            if (window.XamanSdk) {
+                console.log('🔗 Xaman SDK present');
+                try {
+                    console.log('📱 SDK state check...');
+                } catch (e) {
+                    console.log('❌ SDK state check failed:', e.message);
+                }
+            } else {
+                console.log('❌ Xaman SDK not found');
+            }
+        };
     </script>
     <script type="module" src="./src/js/app.js"></script>
 </body>
