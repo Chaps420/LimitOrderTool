@@ -309,6 +309,7 @@ export class WalletConnectorGitHub {
                 }
                 
                 // Subscribe to payload updates with QR status updates
+                console.log('🔄 Subscribing to payload updates...');
                 const result = await this.xumm.payload.subscribe(payload.uuid, (event) => {
                     console.log('📡 Payload update:', event);
                     
@@ -319,13 +320,9 @@ export class WalletConnectorGitHub {
                             // Don't close modal immediately - let user see success message
                             setTimeout(() => {
                                 window.closeQRModal();
-                            }, 3000);
+                            }, 2000);
                         } else if (event.signed === false) {
                             window.updateQRStatus('❌ Transaction was rejected or cancelled', 'error');
-                            // Close modal after showing error
-                            setTimeout(() => {
-                                window.closeQRModal();
-                            }, 3000);
                         } else if (event.opened === true) {
                             window.updateQRStatus('📱 Xaman app opened - please review the transaction', 'info');
                         } else if (event.dispatched === true) {
@@ -334,7 +331,27 @@ export class WalletConnectorGitHub {
                     }
                 });
                 
-                return { success: !!result.signed, transaction: result };
+                console.log('📊 Payload subscription result:', result);
+                console.log('📊 Result.signed:', result?.signed);
+                console.log('📊 Result details:', result);
+                
+                // If subscription failed, try to get payload status directly
+                if (!result || result.signed === undefined) {
+                    console.log('🔄 Subscription result unclear, checking payload status directly...');
+                    try {
+                        const payloadStatus = await this.xumm.payload.get(payload.uuid);
+                        console.log('📊 Direct payload status:', payloadStatus);
+                        
+                        if (payloadStatus && payloadStatus.meta && payloadStatus.meta.signed === true) {
+                            console.log('✅ Direct check confirms transaction was signed');
+                            return { success: true, transaction: payloadStatus };
+                        }
+                    } catch (statusError) {
+                        console.error('❌ Failed to get direct payload status:', statusError);
+                    }
+                }
+                
+                return { success: !!result?.signed, transaction: result };
             }
             
             console.error('❌ Payload creation failed - no UUID returned');
@@ -457,12 +474,23 @@ export class WalletConnectorGitHub {
                     } else {
                         console.log(`❌ Order ${i + 1} was not signed`);
                         
-                        // Ask user if they want to continue with remaining orders
+                        // Only ask about continuing if there are more orders AND user didn't explicitly cancel
                         if (i < orders.length - 1) {
+                            // Give user a moment to see the status
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                            
                             const continueProcess = confirm(`Order ${i + 1} was not signed. Continue with remaining ${orders.length - i - 1} orders?`);
                             if (!continueProcess) {
                                 console.log('🛑 User chose to stop processing remaining orders');
                                 break;
+                            } else {
+                                console.log('🔄 User chose to continue with remaining orders');
+                                // Close the current QR modal before proceeding
+                                if (typeof window.closeQRModal === 'function') {
+                                    window.closeQRModal();
+                                }
+                                // Brief pause before next order
+                                await new Promise(resolve => setTimeout(resolve, 1000));
                             }
                         }
                     }
